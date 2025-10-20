@@ -11,6 +11,7 @@ import {
   orderBy,
   limit,
   getDocs,
+  getDoc
 } from "firebase/firestore";
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";

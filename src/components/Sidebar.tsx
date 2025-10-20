@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Home, FileText, Search, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
 
 const menuItems = [
   { icon: Home, label: "Dashboard", path: "/" },
@@ -14,6 +15,7 @@ const menuItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   return (
     <aside className="w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
@@ -22,16 +24,16 @@ export function Sidebar() {
           <h2 className="text-lg font-semibold">Menu</h2>
         </div>
         <nav className="flex-1 px-4 space-y-2">
-          {menuItems.map((item) => {
+          {menuItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = pathname === item.path;
 
             return (
-              <Link
-                key={item.path}
-                href={item.path}
+              <span
+                key={index}
+                onClick={() => router.push(item.path)}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors cursor-pointer",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
@@ -39,7 +41,7 @@ export function Sidebar() {
               >
                 <Icon className="h-5 w-5" />
                 <span>{item.label}</span>
-              </Link>
+              </span>
             );
           })}
         </nav>
