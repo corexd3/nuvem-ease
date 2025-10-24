@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "jurid-me",
+    "default": "kip-assistent",
     "prod": "kip-assistent"
   },
   "targets": {},
