@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "nfc-app-be1a9"
-  }
+    "default": "jurid-me",
+    "prod": "kip-assistent"
+  },
+  "targets": {},
+  "etags": {}
 }

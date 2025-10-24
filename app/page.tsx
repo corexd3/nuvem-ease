@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, } from "firebase/auth";
 import {
   collection,
   query,
@@ -19,6 +19,8 @@ import { StatsCard } from "@/components/StatsCard";
 import { InvoiceTable } from "@/components/InvoiceTable";
 import { FileText, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+import {httpsCallable} from "firebase/functions";
 
 interface DashboardStats {
   total: number;
@@ -63,7 +65,7 @@ export default function Dashboard() {
         invoicesRef,
         where("user_id", "==", userId),
         orderBy("created_at", "desc"),
-        limit(10)
+        limit(20)
       );
 
       const querySnapshot = await getDocs(q);

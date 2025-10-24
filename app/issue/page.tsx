@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, functions, handleCreateInvoice } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -18,8 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { httpsCallable } from "firebase/functions";
+import { useToast } from "@/hooks/use-toast";
 
 interface InvoiceItem {
   id: string;
@@ -27,7 +28,7 @@ interface InvoiceItem {
   quantity: number;
   unit_value: number;
   total_value: number;
-}
+};
 
 export default function IssueInvoice() {
   const router = useRouter();
@@ -95,37 +96,31 @@ export default function IssueInvoice() {
     try {
       const totalValue = calculateTotal();
 
-      // Create invoice document in Firestore
-      const invoiceRef = await addDoc(collection(db, "invoices"), {
-        user_id: user.uid,
+      // Prepare NFC-e data
+      const nfceData = {
         numero: formData.numero,
         serie: formData.serie,
-        customer_cpf_cnpj: formData.customer_cpf_cnpj,
-        customer_name: formData.customer_name,
-        customer_email: formData.customer_email,
-        payment_method: formData.payment_method,
-        total_value: totalValue,
-        status: "pending",
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-      });
-
-      // Create invoice items using batch write
-      const batch = writeBatch(db);
-      items.forEach(item => {
-        const itemRef = doc(collection(db, "invoice_items"));
-        batch.set(itemRef, {
-          invoice_id: invoiceRef.id,
-          product_name: item.product_name,
-          quantity: item.quantity,
-          unit_value: item.unit_value,
-          total_value: item.total_value,
-          created_at: serverTimestamp(),
-        });
-      });
-
-      await batch.commit();
-
+        ambiente: "homologacao",
+        cliente: {
+          cpf_cnpj: formData.customer_cpf_cnpj,
+          nome: formData.customer_name,
+          email: formData.customer_email
+        },
+        pagamento: formData.payment_method,
+        total: totalValue,
+        itens: items.map(item => ({
+          nome: item.product_name,
+          quantidade: item.quantity,
+          valor_unitario: item.unit_value,
+          valor_total: item.total_value
+        }))
+      };
+      // Call NuvemFiscal API to issue NFC-e
+      const nfceResponse = httpsCallable(functions, "createInvoice");
+      const result = await nfceResponse({...nfceData});
+      if(!result.data) {
+        throw new Error("Failed to create invoice");
+      }
       toast({
         title: "Success",
         description: "Invoice created successfully",

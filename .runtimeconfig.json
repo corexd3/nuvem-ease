@@ -1,0 +1,9 @@
+{
+  "nuvemfiscal": {
+    "base_url": "https://api.sandbox.nuvemfiscal.com.br",
+    "api_key": "YOUR_SANDBOX_API_KEY",
+    "cnpj": "YOUR_CNPJ_NUMBER",
+    "name": "YOUR_BUSINESS_NAME",
+    "cert_password": "YOUR_CERT_PASSWORD"
+  }
+} 

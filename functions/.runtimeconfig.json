@@ -1,0 +1,11 @@
+{
+  "nuvemfiscal": {
+    "key": "6vLyhOUzzquL3Fsvwji2",
+    "base_url": "https://api.nuvemfiscal.com.br",
+    "cert_password": "test123",
+    "cnpj": "28.084.062/0001-48",
+    "name": "Kip Tecnologia",
+    "api_key": "6vLyhOUzzquL3Fsvwji2",
+    "cert": "test"
+  }
+}

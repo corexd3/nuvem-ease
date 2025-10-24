@@ -10,7 +10,8 @@ const nextConfig: NextConfig = {
   output: 'export',
   images: {
     unoptimized: true
-  }
+  },
+  crossOrigin: 'anonymous',
 };
 
 export default nextConfig;

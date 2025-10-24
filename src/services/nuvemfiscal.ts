@@ -2,7 +2,48 @@ import axios from 'axios';
 
 const BASE_URL = 'https://api.nuvemfiscal.com.br/';
 
-// API configuration
+export class NuvemFiscalAPI {
+  private api;
+
+  constructor() {
+    this.api = axios.create({
+      baseURL: BASE_URL,
+      headers: {
+        'Authorization': `Bearer ${process.env.NEXT_PUBLIC_NUVEMFISCAL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  async createNFCe(data: any) {
+    try {
+      const response = await this.api.post('/nfce', data);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error creating NFC-e');
+    }
+  }
+
+  async getNFCeStatus(id: string) {
+    try {
+      const response = await this.api.get(`/nfce/${id}/status`);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error getting NFC-e status');
+    }
+  }
+
+  async cancelNFCe(id: string, justificativa: string) {
+    try {
+      const response = await this.api.post(`/nfce/${id}/cancelar`, { justificativa });
+      return response.data;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'Error canceling NFC-e');
+    }
+  }
+}
+
+// Standalone API configuration for existing services
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {

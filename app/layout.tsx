@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@lovable_dev",
     images: ["https://lovable.dev/opengraph-image-p98pqg.png"],
-  },
+  }
 };
 
 export default function RootLayout({
