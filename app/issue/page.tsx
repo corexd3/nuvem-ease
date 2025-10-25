@@ -30,6 +30,16 @@ interface InvoiceItem {
   total_value: number;
 };
 
+const validation = (cpf) => {
+  const cleaned = cpf.replace(/\D/g, "");
+  if(cleaned.length === 11){
+    return {valid : true, type : "cpf"}
+  } else if(cleaned.length === 14){
+    return {valid : true, type : "cnpj"}
+  } 
+  return {valid : false, type : null}
+}
+
 export default function IssueInvoice() {
   const router = useRouter();
   const { toast } = useToast();
@@ -97,6 +107,10 @@ export default function IssueInvoice() {
       const totalValue = calculateTotal();
 
       // Prepare NFC-e data
+      const isValid = validation(formData.customer_cpf_cnpj);
+      if(!isValid){
+        return ;
+      }
       const nfceData = {
         numero: formData.numero,
         serie: formData.serie,
@@ -109,13 +123,14 @@ export default function IssueInvoice() {
         pagamento: formData.payment_method,
         total: totalValue,
         itens: items.map(item => ({
-          nome: item.product_name,
-          quantidade: item.quantity,
-          valor_unitario: item.unit_value,
-          valor_total: item.total_value
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_value: item.unit_value,
+          total_value: item.total_value
         }))
       };
       // Call NuvemFiscal API to issue NFC-e
+      console.log(nfceData);
       const nfceResponse = httpsCallable(functions, "createInvoice");
       const result = await nfceResponse({...nfceData});
       if(!result.data) {
@@ -137,6 +152,8 @@ export default function IssueInvoice() {
       setLoading(false);
     }
   };
+
+
 
   if (!user) return null;
 
