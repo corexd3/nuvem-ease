@@ -17,6 +17,7 @@ import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { StatsCard } from "@/components/StatsCard";
 import { InvoiceTable } from "@/components/InvoiceTable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [user, setUser] = useState<any>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<string>("nfce");
   const [stats, setStats] = useState<DashboardStats>({
     total: 0,
     authorized: 0,
@@ -45,6 +47,7 @@ export default function Dashboard() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
+        setLoading(false);
         router.push("/auth");
         return;
       }
@@ -65,7 +68,7 @@ export default function Dashboard() {
         invoicesRef,
         where("user_id", "==", userId),
         orderBy("created_at", "desc"),
-        limit(20)
+        limit(100)
       );
 
       const querySnapshot = await getDocs(q);
@@ -75,14 +78,7 @@ export default function Dashboard() {
       })) as any[];
 
       setInvoices(invoicesData);
-
-      // Calculate stats
-      const total = invoicesData.length;
-      const authorized = invoicesData.filter((i: any) => i.status === "authorized").length;
-      const cancelled = invoicesData.filter((i: any) => i.status === "cancelled").length;
-      const pending = invoicesData.filter((i: any) => i.status === "pending").length;
-
-      setStats({ total, authorized, cancelled, pending });
+      calculateStats(invoicesData, activeTab);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -94,6 +90,27 @@ export default function Dashboard() {
     }
   };
 
+  const calculateStats = (invoicesData: any[], invoiceType: string) => {
+    // Filter invoices by type (default to 'nfce' if not specified)
+    const filteredInvoices = invoicesData.filter(
+      (i: any) => (i.invoice_type || "nfce") === invoiceType
+    );
+
+    const total = filteredInvoices.length;
+    const authorized = filteredInvoices.filter((i: any) => i.status === "authorized").length;
+    const cancelled = filteredInvoices.filter((i: any) => i.status === "cancelled").length;
+    const pending = filteredInvoices.filter((i: any) => i.status === "pending").length;
+
+    setStats({ total, authorized, cancelled, pending });
+  };
+
+  useEffect(() => {
+    if (invoices.length > 0) {
+      calculateStats(invoices, activeTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -101,6 +118,10 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const getFilteredInvoices = (invoiceType: string) => {
+    return invoices.filter((i: any) => (i.invoice_type || "nfce") === invoiceType);
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -112,41 +133,116 @@ export default function Dashboard() {
             <div>
               <h1 className="text-3xl font-bold">Dashboard</h1>
               <p className="text-muted-foreground mt-2">
-                Overview of your NFC-e invoices
+                Overview of your tax invoices
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatsCard
-                title="Total Invoices"
-                value={stats.total}
-                icon={FileText}
-                variant="default"
-              />
-              <StatsCard
-                title="Authorized"
-                value={stats.authorized}
-                icon={CheckCircle}
-                variant="success"
-              />
-              <StatsCard
-                title="Cancelled"
-                value={stats.cancelled}
-                icon={XCircle}
-                variant="destructive"
-              />
-              <StatsCard
-                title="Pending"
-                value={stats.pending}
-                icon={Clock}
-                variant="warning"
-              />
-            </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="nfce">NFC-e</TabsTrigger>
+                <TabsTrigger value="nfe">NF-e</TabsTrigger>
+                <TabsTrigger value="nfse">NFS-e</TabsTrigger>
+              </TabsList>
 
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Recent Invoices</h2>
-              <InvoiceTable invoices={invoices} />
-            </div>
+              <TabsContent value="nfce" className="space-y-6 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <StatsCard
+                    title="Total Invoices"
+                    value={stats.total}
+                    icon={FileText}
+                    variant="default"
+                  />
+                  <StatsCard
+                    title="Authorized"
+                    value={stats.authorized}
+                    icon={CheckCircle}
+                    variant="success"
+                  />
+                  <StatsCard
+                    title="Cancelled"
+                    value={stats.cancelled}
+                    icon={XCircle}
+                    variant="destructive"
+                  />
+                  <StatsCard
+                    title="Pending"
+                    value={stats.pending}
+                    icon={Clock}
+                    variant="warning"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold">Recent NFC-e Invoices</h2>
+                  <InvoiceTable invoices={getFilteredInvoices("nfce")} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="nfe" className="space-y-6 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <StatsCard
+                    title="Total Invoices"
+                    value={stats.total}
+                    icon={FileText}
+                    variant="default"
+                  />
+                  <StatsCard
+                    title="Authorized"
+                    value={stats.authorized}
+                    icon={CheckCircle}
+                    variant="success"
+                  />
+                  <StatsCard
+                    title="Cancelled"
+                    value={stats.cancelled}
+                    icon={XCircle}
+                    variant="destructive"
+                  />
+                  <StatsCard
+                    title="Pending"
+                    value={stats.pending}
+                    icon={Clock}
+                    variant="warning"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold">Recent NF-e Invoices</h2>
+                  <InvoiceTable invoices={getFilteredInvoices("nfe")} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="nfse" className="space-y-6 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <StatsCard
+                    title="Total Invoices"
+                    value={stats.total}
+                    icon={FileText}
+                    variant="default"
+                  />
+                  <StatsCard
+                    title="Authorized"
+                    value={stats.authorized}
+                    icon={CheckCircle}
+                    variant="success"
+                  />
+                  <StatsCard
+                    title="Cancelled"
+                    value={stats.cancelled}
+                    icon={XCircle}
+                    variant="destructive"
+                  />
+                  <StatsCard
+                    title="Pending"
+                    value={stats.pending}
+                    icon={Clock}
+                    variant="warning"
+                  />
+                </div>
+                <div className="space-y-4">
+                  <h2 className="text-xl font-semibold">Recent NFS-e Invoices</h2>
+                  <InvoiceTable invoices={getFilteredInvoices("nfse")} />
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>

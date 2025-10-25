@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ export default function CertificatesPage() {
   const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
 
-  const loadCertificates = async () => {
+  const loadCertificates = useCallback(async () => {
     setLoading(true);
     try {
       const response = await CertificateService.listCertificates();
@@ -45,11 +45,11 @@ export default function CertificatesPage() {
       });
     }
     setLoading(false);
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadCertificates();
-  }, []);
+  }, [loadCertificates]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();

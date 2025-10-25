@@ -6,12 +6,12 @@ import { Providers } from "@/components/providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "NFC-e Manager - Electronic Invoice Management",
-  description: "Professional NFC-e management platform integrated with NuvemFiscal API for issuing, querying, and cancelling electronic consumer invoices",
+  title: "Nuvem Ease - Brazilian Tax Invoice Management",
+  description: "Professional tax invoice management platform integrated with NuvemFiscal API for issuing, querying, and cancelling NF-e, NFC-e, and NFS-e invoices",
   authors: [{ name: "Lovable" }],
   openGraph: {
-    title: "nuvem-ease",
-    description: "Lovable Generated Project",
+    title: "Nuvem Ease",
+    description: "Brazilian Tax Invoice Management",
     type: "website",
     images: ["https://lovable.dev/opengraph-image-p98pqg.png"],
   },

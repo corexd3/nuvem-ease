@@ -100,9 +100,9 @@ export default function Auth() {
               <FileText className="h-8 w-8" />
             </div>
           </div>
-          <CardTitle className="text-2xl">NFC-e Manager</CardTitle>
+          <CardTitle className="text-2xl">Nuvem Ease</CardTitle>
           <CardDescription>
-            Manage your electronic consumer invoices
+            Manage your Brazilian tax invoices (NF-e, NFC-e, NFS-e)
           </CardDescription>
         </CardHeader>
         <CardContent>

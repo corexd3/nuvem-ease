@@ -8,9 +8,9 @@ import { cn } from "@/lib/utils";
 
 const menuItems = [
   { icon: Home, label: "Dashboard", path: "/" },
-  { icon: FileText, label: "Issue NFC-e", path: "/issue" },
-  { icon: Search, label: "Query NFC-e", path: "/query" },
-  { icon: XCircle, label: "Cancel NFC-e", path: "/cancel" },
+  { icon: FileText, label: "Issue", path: "/issue" },
+  { icon: Search, label: "Query", path: "/query" },
+  { icon: XCircle, label: "Cancel", path: "/cancel" },
 ];
 
 export function Sidebar() {
