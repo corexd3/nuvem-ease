@@ -8,7 +8,7 @@ import {
   collection,
   query,
   where,
-  getDocs,
+  getDocs,  
   updateDoc,
   doc,
   serverTimestamp,
