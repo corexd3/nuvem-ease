@@ -7,9 +7,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { NFCeForm } from "@/components/forms/NFCeForm";
-import { NFeForm } from "@/components/forms/NFeForm";
-import { NFSeForm } from "@/components/forms/NFSeForm";
+import { NFeFormSimple } from "@/components/forms/NFeFormSimple";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
 
 export default function IssuePage() {
   const router = useRouter();
@@ -47,29 +47,61 @@ export default function IssuePage() {
         <main className="flex-1 p-8 bg-background">
           <div className="max-w-6xl mx-auto">
             <div className="mb-8">
-              <h1 className="text-3xl font-bold">Issue Tax Invoice</h1>
+              <h1 className="text-3xl font-bold">Issue Invoice</h1>
               <p className="text-muted-foreground mt-2">
-                Create electronic tax invoices (NF-e, NFC-e, NFS-e)
+                Create electronic tax invoices
               </p>
             </div>
 
-            <Tabs defaultValue="nfce" className="w-full">
+            <Tabs defaultValue="nfe" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="nfce">NFC-e (Consumer)</TabsTrigger>
                 <TabsTrigger value="nfe">NF-e (Products)</TabsTrigger>
+                <TabsTrigger value="nfce">NFC-e (Consumer)</TabsTrigger>
                 <TabsTrigger value="nfse">NFS-e (Services)</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="nfce" className="mt-6" forceMount>
-                {<NFCeForm />}
+              <TabsContent value="nfe" className="mt-6">
+                <NFeFormSimple />
               </TabsContent>
 
-              <TabsContent value="nfe" className="mt-6" forceMount>
-                {<NFeForm />}
+              <TabsContent value="nfce" className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                      NFC-e - Design Only
+                    </CardTitle>
+                    <CardDescription>
+                      NFC-e (Consumer Invoice) functionality is for design purposes only
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground">
+                      This tab demonstrates the UI for NFC-e invoices but is not connected to the API.
+                      Only NF-e is fully functional for testing with NuvemFiscal.
+                    </p>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
-              <TabsContent value="nfse" className="mt-6" forceMount>
-                {<NFSeForm />}
+              <TabsContent value="nfse" className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                      NFS-e - Design Only
+                    </CardTitle>
+                    <CardDescription>
+                      NFS-e (Service Invoice) functionality is for design purposes only
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground">
+                      This tab demonstrates the UI for NFS-e invoices but is not connected to the API.
+                      Only NF-e is fully functional for testing with NuvemFiscal.
+                    </p>
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>

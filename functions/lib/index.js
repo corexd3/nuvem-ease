@@ -1,240 +1,165 @@
 import * as functions from "firebase-functions";
 import admin from 'firebase-admin';
 import axios from 'axios';
-import fs from 'fs';
-import * as os from 'os';
-import * as dotenv from "dotenv";
-import { defineString } from "firebase-functions/params";
-dotenv.config();
 admin.initializeApp();
 const db = admin.firestore();
-const nuvemBaseUrl = defineString('NUVEMFISCAL_BASE_URL').value() || process.env.NUVEMFISCAL_BASE_URL;
-const nuvemApiKey = defineString('NUVEMFISCAL_API_KEY').value() || process.env.NUVEMFISCAL_API_KEY;
-const CLIENT_ID = defineString('NUVEM_CLIENT_ID').value() || process.env.NUVEM_CLIENT_ID;
-// const CLIENT_SECRET = defineString('NUVEM_CLIENT_SECRET') || process.env.NUVEM_CLIENT_SECRET;
-// Configure certificates if needed
-const pfxBase64 = process.env.cert_pfx_password;
-;
-if (pfxBase64) {
-    const pfxPath = `${os.tmpdir()}/cert.pfx`;
-    fs.writeFileSync(pfxPath, Buffer.from(pfxBase64, 'base64'));
-}
-// async function getTokenFromStore(id : number) {
-//     const doc = await db.collection("TOKEN_DOC").doc(id).get();
-//     return doc.exists ? doc.data() : null;
-// }
-// async function saveTokenToStore(id : number, tokenObj : any) {
-//     await db.collection("TOKEN_DOC").doc(id).set(tokenObj, { merge: true });
-// }
-// async function getNewToken() {
-//     const params = new URLSearchParams();
-//     params.append("grant_type", "client_credentials");
-//     params.append("client_id", CLIENT_ID || "");
-//     params.append("client_secret", CLIENT_SECRET || "");
-//     params.append("scope", "nfce:write nfce:read");
-//     const response = await axios.post(`${nuvemBaseUrl}oauth/token`, params, {
-//         headers: {
-//             'Content-Type': 'application/x-www-form-urlencoded'
-//         },
-//         timeout: 10000
-//     });
-//     const now = Date.now();
-//     const expireIn = response.data.expires_in || 3600;
-//     const expireOut = now + (expireIn * 1000);
-//     const tokenObj = {
-//         access_token: response.data.access_token,
-//         token_type: response.data.token_type,
-//         expires_in: expireIn,
-//         expire_out: expireOut,
-//         updated_at: admin.firestore.Timestamp.now()
-//     };
-//     await saveTokenToStore(tokenObj);
-//     return tokenObj;
-// }
-// async function getValidToken() {
-//     const storedToken = await getTokenFromStore();
-//     const now = Date.now();
-//     if (storedToken && storedToken.access_token && storedToken.expire_out && storedToken.expire_out > now + 60000) {
-//         return storedToken.access_token;
-//     }
-//     const newToken = await getNewToken();
-//     return newToken.access_token;
-// }
-export const createInvoice = functions.https.onCall(async (request) => {
+const NUVEM_API_KEY = process.env.NUVEMFISCAL_API_KEY || "";
+const NUVEM_BASE_URL = "https://api.nuvemfiscal.com.br/";
+// Issue NF-e
+export const issueNFe = functions.https.onCall(async (request) => {
+    var _a, _b, _c;
+    try {
+        if (!request.auth) {
+            throw new functions.https.HttpsError("unauthenticated", "Authentication required");
+        }
+        const data = request.data;
+        const uid = request.auth.uid;
+        // Validate required fields
+        if (!((_a = data === null || data === void 0 ? void 0 : data.emittente) === null || _a === void 0 ? void 0 : _a.cpf_cnpj) || !(data === null || data === void 0 ? void 0 : data.destinatario) || !(data === null || data === void 0 ? void 0 : data.produtos)) {
+            throw new functions.https.HttpsError("invalid-argument", "Missing required fields");
+        }
+        // Create NF-e in NuvemFiscal
+        const nfePayload = {
+            ambiente: "homologacao",
+            referencia: `nfe_${Date.now()}`,
+            emitente: {
+                cpf_cnpj: data.emittente.cpf_cnpj,
+                inscricao_estadual: data.emittente.inscricao_estadual,
+                razao_social: data.emittente.razao_social,
+                endereco: data.emittente.endereco
+            },
+            destinatario: {
+                cpf_cnpj: data.destinatario.cpf_cnpj,
+                razao_social: data.destinatario.razao_social,
+                endereco: data.destinatario.endereco
+            },
+            itens: data.produtos.map((item, index) => ({
+                numero_item: (index + 1).toString(),
+                codigo_produto: item.codigo,
+                descricao: item.descricao,
+                cfop: item.cfop,
+                ncm: item.ncm,
+                unidade_comercial: item.unidade,
+                quantidade_comercial: item.quantidade,
+                valor_unitario_comercial: item.valor_unitario,
+                valor_bruto: item.valor_total,
+                icms_origem: "0",
+                icms_situacao_tributaria: item.cst_icms || "102"
+            })),
+            pagamento: data.pagamento
+        };
+        const result = await axios.post(`${NUVEM_BASE_URL}v2/nfe`, nfePayload, {
+            headers: {
+                'Authorization': `Bearer ${NUVEM_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        // Save to Firestore
+        const invoiceRef = db.collection("invoices").doc();
+        await invoiceRef.set({
+            user_id: uid,
+            nfe_id: result.data.id,
+            type: "nfe",
+            status: result.data.status || "processing",
+            emittente: data.emittente,
+            destinatario: data.destinatario,
+            produtos: data.produtos,
+            valor_total: data.produtos.reduce((sum, p) => sum + p.valor_total, 0),
+            created_at: admin.firestore.FieldValue.serverTimestamp()
+        });
+        return {
+            success: true,
+            invoice_id: invoiceRef.id,
+            nfe_id: result.data.id,
+            data: result.data
+        };
+    }
+    catch (error) {
+        console.error('NF-e creation error:', ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message);
+        throw new functions.https.HttpsError('internal', 'Failed to issue NF-e', ((_c = error.response) === null || _c === void 0 ? void 0 : _c.data) || error.message);
+    }
+});
+// Query invoice status
+export const queryInvoice = functions.https.onCall(async (request) => {
     var _a, _b;
     try {
-        console.log('🔧 Environment check:');
-        console.log('- nuvemBaseUrl:', nuvemBaseUrl);
-        console.log('- nuvemApiKey exists:', !!nuvemApiKey);
-        console.log('- CLIENT_ID exists:', !!CLIENT_ID);
-        if (!nuvemBaseUrl || !nuvemApiKey) {
-            throw new functions.https.HttpsError('failed-precondition', 'Environment variables not configured properly');
-        }
         if (!request.auth) {
-            throw new functions.https.HttpsError("unauthenticated", "You must be authenticated to call this function.");
+            throw new functions.https.HttpsError("unauthenticated", "Authentication required");
         }
-        const uid = request.auth.uid;
-        console.log('✅ User authenticated:', uid);
-        if (!uid) {
-            throw new Error("Invalid user ID");
+        const { invoice_id } = request.data;
+        if (!invoice_id) {
+            throw new functions.https.HttpsError("invalid-argument", "invoice_id required");
         }
-        const data = request.data;
-        if (!((_a = data.cliente) === null || _a === void 0 ? void 0 : _a.nome) || !((_b = data.cliente) === null || _b === void 0 ? void 0 : _b.cpf_cnpj)) {
-            throw new functions.https.HttpsError('invalid-argument', 'Missing customer data');
+        const invoiceDoc = await db.collection("invoices").doc(invoice_id).get();
+        if (!invoiceDoc.exists) {
+            throw new functions.https.HttpsError("not-found", "Invoice not found");
         }
-        const cliente_nome = data.cliente.nome;
-        const cnpj = data.cliente.cpf_cnpj;
-        console.log('📝 Creating customer record...');
-        const customerRef = db.collection("customers").doc();
-        await customerRef.set({
-            user_id: uid,
-            name: cliente_nome,
-            cpf_cnpj: cnpj,
-            created_at: admin.firestore.FieldValue.serverTimestamp(),
-            status: "creating in Nuvemfiscal"
-        });
-        console.log('✅ Customer record created:', customerRef.id);
-        console.log('🌐 Calling NuvemFiscal API...');
-        console.log('URL:', `${nuvemBaseUrl}/v2/empresas`);
-        const nfcrep = await axios.post(`${nuvemBaseUrl}v2/empresas`, {
-            nome: cliente_nome,
-            cnpj
-        }, {
+        const invoiceData = invoiceDoc.data();
+        const nfeId = invoiceData === null || invoiceData === void 0 ? void 0 : invoiceData.nfe_id;
+        // Query NuvemFiscal
+        const response = await axios.get(`${NUVEM_BASE_URL}v2/nfe/${nfeId}`, {
             headers: {
-                Authorization: `Bearer ${nuvemApiKey}`,
+                'Authorization': `Bearer ${NUVEM_API_KEY}`,
+                'Content-Type': 'application/json'
             }
         });
-        console.log('✅ NuvemFiscal registration successful');
-        console.log('✅ NuvemFiscal registration successful');
-        const { client_id, client_password } = nfcrep.data;
-        console.log('🔐 Getting OAuth token...');
-        const tokenResp = await axios.post(`${nuvemBaseUrl}oauth/token`, new URLSearchParams({
-            grant_type: "client_credentials",
-            client_id: client_id,
-            client_secret: client_password,
-            scope: "nfce:write nfce:read"
-        }));
-        console.log('✅ OAuth token received');
-        await db.collection("nuvemfiscal_clients").doc(customerRef.id).set({
-            client_id,
-            client_password,
-            access_token: tokenResp.data.access_token,
-            expires_at: Date.now() + (tokenResp.data.expires_in * 1000)
+        // Update status in Firestore
+        await db.collection("invoices").doc(invoice_id).update({
+            status: response.data.status,
+            updated_at: admin.firestore.FieldValue.serverTimestamp()
         });
-        console.log('📄 Creating NFCe...');
-        await customerRef.update({ status: "created in Nuvemfiscal" });
-        // Call NuvemFiscal API to create invoice
-        const token = tokenResp.data.access_token;
-        const inputData = {
-            "ambiente": " producao",
-            "emisor": {
-                "CNPJ": data.cliente.cpf_cnpj,
-                "inscricaoEstadual": "123456789012",
-                "razãoSocial": data.cliente.nome,
-                "nomeFantasia": "ACME Tienda",
-                "endereco": {
-                    "logradouro": "Av. Ejemplo",
-                    "numero": "1000",
-                    "complemento": "Tienda 1",
-                    "bairro": "Centro",
-                    "codigoMunicipio": "3550308",
-                    "nomeMunicipio": "São Paulo",
-                    "uf": "SP",
-                    "cep": "01000-000",
-                    "pais": "BR"
-                }
-            },
-            "totais": {
-                "valorTotal": data.total,
-                "valorImpostos": "0.00"
-            },
-            "pagamentos": [
-                {
-                    "formaPagamento": "03",
-                    "valor": "150.00"
-                }
-            ],
-            "informacoesAdicionais": {
-                "observacaoConsumidor": "Compra vía aplicación móvil"
-            }
+        return {
+            success: true,
+            status: response.data.status,
+            data: response.data
         };
-        const result = await axios.post(`${nuvemBaseUrl}v2/nfce`, inputData, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            timeout: 30000
-        });
-        // 4 Write invoice + items to Firestore in a batch
-        const batch = db.batch();
-        const invoiceRef = db.collection("invoices").doc();
-        batch.set(invoiceRef, {
-            user_id: uid,
-            nfce_id: result.data.id,
-            status: "processing",
-            customer: data.cliente,
-            total_value: data.total,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        data.itens.forEach((item) => {
-            const itemRef = db.collection("invoice_items").doc();
-            batch.set(itemRef, {
-                invoice_id: invoiceRef.id,
-                product_name: item.product_name,
-                quantity: item.quantity,
-                unit_value: item.unit_value,
-                total_value: item.total_value,
-                created_at: admin.firestore.FieldValue.serverTimestamp(),
-            });
-        });
-        await batch.commit();
-        return { success: true, data: result.data };
     }
     catch (error) {
-        throw new functions.https.HttpsError('internal', 'Error creating invoice', error);
+        console.error('Query error:', ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
+        throw new functions.https.HttpsError('internal', 'Failed to query invoice', ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message);
     }
 });
-export const getInvoiceStatus = functions.https.onCall(async (request) => {
-    try {
-        if (!request.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-        }
-        // Call external API to get invoice status
-        const data = request.data;
-        const response = await axios.get(`${nuvemBaseUrl}nfce/${data.invoiceId}/status`, {
-            headers: {
-                'Authorization': `Bearer ${nuvemApiKey}`,
-                'Content-Type': 'application/json'
-            }
-        });
-        if (response.status === 200) {
-            return response.data;
-        }
-    }
-    catch (error) {
-        throw new functions.https.HttpsError('internal', 'Error fetching invoice status', error);
-    }
-});
+// Cancel invoice
 export const cancelInvoice = functions.https.onCall(async (request) => {
+    var _a, _b;
     try {
         if (!request.auth) {
-            throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+            throw new functions.https.HttpsError("unauthenticated", "Authentication required");
         }
-        // Call external API to cancel invoice
-        const uid = request.auth.uid;
-        const data = request.data;
-        const response = await axios.post(`${nuvemBaseUrl}nfce/${data.invoiceId}/cancel`, {}, {
+        const { invoice_id, justificativa } = request.data;
+        if (!invoice_id || !justificativa) {
+            throw new functions.https.HttpsError("invalid-argument", "invoice_id and justificativa required");
+        }
+        if (justificativa.length < 15) {
+            throw new functions.https.HttpsError("invalid-argument", "Justification must be at least 15 characters");
+        }
+        const invoiceDoc = await db.collection("invoices").doc(invoice_id).get();
+        if (!invoiceDoc.exists) {
+            throw new functions.https.HttpsError("not-found", "Invoice not found");
+        }
+        const invoiceData = invoiceDoc.data();
+        const nfeId = invoiceData === null || invoiceData === void 0 ? void 0 : invoiceData.nfe_id;
+        // Cancel in NuvemFiscal
+        const response = await axios.post(`${NUVEM_BASE_URL}v2/nfe/${nfeId}/cancelamento`, { justificativa }, {
             headers: {
-                'Authorization': `Bearer ${nuvemApiKey}`,
+                'Authorization': `Bearer ${NUVEM_API_KEY}`,
                 'Content-Type': 'application/json'
             }
         });
-        if (response.status === 200) {
-            return response.data;
-        }
+        // Update in Firestore
+        await db.collection("invoices").doc(invoice_id).update({
+            status: "cancelled",
+            cancelled_at: admin.firestore.FieldValue.serverTimestamp(),
+            cancellation_reason: justificativa
+        });
+        return {
+            success: true,
+            data: response.data
+        };
     }
     catch (error) {
-        throw new functions.https.HttpsError('internal', 'Error cancelling invoice', error);
+        console.error('Cancellation error:', ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) || error.message);
+        throw new functions.https.HttpsError('internal', 'Failed to cancel invoice', ((_b = error.response) === null || _b === void 0 ? void 0 : _b.data) || error.message);
     }
 });
 //# sourceMappingURL=index.js.map

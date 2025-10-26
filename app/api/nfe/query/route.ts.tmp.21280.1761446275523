@@ -1,0 +1,86 @@
+import { NextRequest, NextResponse } from 'next/server';
+import axios from 'axios';
+import { getAuth, getFirestore } from '@/lib/firebase-admin';
+import admin from 'firebase-admin';
+
+const NUVEM_API_KEY = process.env.NUVEMFISCAL_API_KEY || "";
+const NUVEM_BASE_URL = "https://api.nuvemfiscal.com.br/";
+
+export async function POST(request: NextRequest) {
+  try {
+    // Get the authorization token from headers
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+
+    // Verify the Firebase ID token
+    try {
+      await admin.auth().verifyIdToken(token);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Invalid token' },
+        { status: 401 }
+      );
+    }
+
+    const { invoice_id } = await request.json();
+
+    if (!invoice_id) {
+      return NextResponse.json(
+        { error: 'invoice_id required' },
+        { status: 400 }
+      );
+    }
+
+    const invoiceDoc = await db.collection("invoices").doc(invoice_id).get();
+
+    if (!invoiceDoc.exists) {
+      return NextResponse.json(
+        { error: 'Invoice not found' },
+        { status: 404 }
+      );
+    }
+
+    const invoiceData = invoiceDoc.data();
+    const nfeId = invoiceData?.nfe_id;
+
+    // Query NuvemFiscal
+    const response = await axios.get(
+      `${NUVEM_BASE_URL}v2/nfe/${nfeId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${NUVEM_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    // Update status in Firestore
+    await db.collection("invoices").doc(invoice_id).update({
+      status: response.data.status,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    return NextResponse.json({
+      success: true,
+      status: response.data.status,
+      data: response.data
+    });
+
+  } catch (error: any) {
+    console.error('Query error:', error.response?.data || error.message);
+    return NextResponse.json(
+      {
+        error: 'Failed to query invoice',
+        details: error.response?.data || error.message
+      },
+      { status: 500 }
+    );
+  }
+}
