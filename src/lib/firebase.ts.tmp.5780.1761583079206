@@ -6,7 +6,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-key-for-build",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
@@ -15,12 +15,8 @@ const firebaseConfig = {
 };
 
 
-// Initialize Firebase only on client side and when not in build mode
-const app = typeof window !== 'undefined' && !getApps().length
-  ? initializeApp(firebaseConfig)
-  : !getApps().length
-    ? initializeApp(firebaseConfig)
-    : getApp();
+// Initialize Firebase only on client side
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -35,14 +31,12 @@ export const handleIssueNFe = async (data: any) => {
 
 export const handleQueryInvoice = async (data: any) => {
   const queryInvoice = httpsCallable(functions, 'queryInvoice_sandbox');
-  const result = await queryInvoice(data);
-  return result.data;
+  return await queryInvoice(data);
 }
 
 export const handleCancelInvoice = async (data: any) => {
   const cancelInvoice = httpsCallable(functions, 'cancelInvoice_sandbox');
-  const result = await cancelInvoice(data);
-  return result.data;
+  return await cancelInvoice(data);
 }
 
 export const handleGenerateInvoicePDF = async (data: any) => {

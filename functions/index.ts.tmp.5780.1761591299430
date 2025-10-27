@@ -6,7 +6,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const NUVEM_BASE_URL = "https://api.sandbox.nuvemfiscal.com.br/";
-const NUVEM_AUTH_URL = "https://auth.nuvemfiscal.com.br/oauth/token"; // Auth URL has no 'sandbox' subdomain
+const NUVEM_AUTH_URL = "https://auth.sandbox.nuvemfiscal.com.br/oauth/token";
 const CLIENT_ID = process.env.CLIENT_ID || "";
 const CLIENT_SECRET = process.env.CLIENT_SECRET || "";
 
@@ -393,6 +393,16 @@ export const cancelInvoice_sandbox = onCall(async (request) => {
 
         const invoiceData = invoiceDoc.data();
         const nfeId = invoiceData?.nfe_id;
+        const currentStatus = invoiceData?.status;
+
+        // Check if invoice can be cancelled
+        // Only "autorizado" (authorized) invoices can be cancelled
+        if (currentStatus !== "autorizado" && currentStatus !== "authorized") {
+            throw new HttpsError(
+                "failed-precondition",
+                `Cannot cancel invoice with status: ${currentStatus}. Only authorized invoices can be cancelled.`
+            );
+        }
 
         // Get OAuth access token
         const nuvemToken = await getNuvemFiscalToken();
@@ -413,15 +423,10 @@ export const cancelInvoice_sandbox = onCall(async (request) => {
             console.log('Current NF-e status from API:', apiStatus);
 
             if (apiStatus !== "autorizado" && apiStatus !== "authorized") {
-                // Return error as data instead of throwing to avoid 500 error in console
-                return {
-                    success: false,
-                    error: {
-                        code: "INVALID_STATUS",
-                        message: `Cannot cancel NF-e. Current status: ${apiStatus}. Only authorized NF-e can be cancelled. Please check the invoice status first.`,
-                        currentStatus: apiStatus
-                    }
-                };
+                throw new HttpsError(
+                    "failed-precondition",
+                    `Cannot cancel NF-e. Current status: ${apiStatus}. Only authorized NF-e can be cancelled. Please check the invoice status first.`
+                );
             }
         } catch (checkError: any) {
             if (checkError instanceof HttpsError) {

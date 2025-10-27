@@ -1,7 +1,8 @@
 {
   "projects": {
-    "default": "p-nfc-818bf",
-    "prod": "p-nfc-818bf"
+    "default": "kip-assistent",
+    "prod": "p-nfc-818bf",
+    "dev": "kip-assistent"
   },
   "targets": {},
   "etags": {}

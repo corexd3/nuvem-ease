@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
-  output: 'export',
+  // Removed 'output: export' because Firebase requires client-side rendering
   images: {
     unoptimized: true
   },

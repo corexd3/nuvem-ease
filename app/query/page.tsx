@@ -1,10 +1,11 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { auth, functions } from "@/lib/firebase";
+import { auth, handleQueryInvoice } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { httpsCallable } from "firebase/functions";
 import { Navbar } from "@/components/Navbar";
 import { Sidebar } from "@/components/Sidebar";
 import { Button } from "@/components/ui/button";
@@ -46,26 +47,39 @@ export default function QueryPage() {
     setResult(null);
 
     try {
-      const queryInvoice = httpsCallable(functions, "queryInvoice");
-      const response = await queryInvoice({ invoice_id: invoiceId });
+      const response = await handleQueryInvoice({ invoice_id: invoiceId });
 
       if (mountedRef.current) {
-        setResult(response.data);
+        setResult(response);
         toast({
           title: "✅ Success",
           description: "Invoice status retrieved",
         });
       }
     } catch (error: any) {
+      console.error("Query error:", error);
+
       if (mountedRef.current) {
+        // Extract detailed error message
+        let errorMessage = error.message || "Failed to query invoice";
+
+        if (error.details?.error?.message) {
+          errorMessage = `${errorMessage}: ${error.details.error.message}`;
+        }
+
         toast({
           title: "❌ Error",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
+          duration: 5000,
         });
+
+        // Clear previous results
+        setResult(null);
       }
     } finally {
       if (mountedRef.current) {
+        // Always re-enable the button
         setQuerying(false);
       }
     }
@@ -114,7 +128,7 @@ export default function QueryPage() {
                       required
                     />
                     <p className="text-sm text-muted-foreground mt-1">
-                      Find this ID in the Firestore "invoices" collection
+                      Find this ID in the Firestore &quot;invoices&quot; collection
                     </p>
                   </div>
 
