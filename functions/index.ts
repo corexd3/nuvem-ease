@@ -276,16 +276,22 @@ export const issueNFe_sandbox = onCall(async (request) => {
 
         // Save to Firestore
         const invoiceRef = db.collection("invoices").doc();
+        const totalValue = data.produtos.reduce((sum: number, p: any) => sum + p.valor_total, 0);
+
         await invoiceRef.set({
             user_id: uid,
             nfe_id: result.data.id,
             invoice_type: "nfe", // Changed from 'type' to 'invoice_type' to match dashboard
             status: result.data.status || "processing",
+            numero: result.data.numero || "Processando...",
             emittente: data.emittente,
             destinatario: data.destinatario,
+            customer_name: data.destinatario?.nome || data.destinatario?.razao_social || null,
             produtos: data.produtos,
-            valor_total: data.produtos.reduce((sum: number, p: any) => sum + p.valor_total, 0),
-            created_at: admin.firestore.FieldValue.serverTimestamp()
+            valor_total: totalValue,
+            total_value: totalValue, // Add alias for compatibility
+            created_at: admin.firestore.FieldValue.serverTimestamp(),
+            raw_response: result.data // Store full API response for reference
         });
 
         return {

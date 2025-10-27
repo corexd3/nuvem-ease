@@ -17,7 +17,7 @@ interface Invoice {
   customer_name: string | null;
   total_value: number;
   status: string;
-  issued_at: string;
+  issued_at: string | null | undefined;
 }
 
 interface InvoiceTableProps {
@@ -79,7 +79,9 @@ export function InvoiceTable({ invoices, onViewDetails }: InvoiceTableProps) {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  {format(new Date(invoice.issued_at), "dd/MM/yyyy HH:mm")}
+                  {invoice.issued_at && !isNaN(new Date(invoice.issued_at).getTime())
+                    ? format(new Date(invoice.issued_at), "dd/MM/yyyy HH:mm")
+                    : "—"}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button

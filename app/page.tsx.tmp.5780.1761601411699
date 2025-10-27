@@ -84,45 +84,18 @@ export default function Dashboard() {
         // Debug: Log the first invoice to see what data we have
         if (querySnapshot.docs.indexOf(doc) === 0) {
           console.log('First invoice raw data:', data);
-          console.log('Destinatario:', data.destinatario);
-          console.log('Raw response:', data.raw_response);
         }
 
         // Extract customer name from destinatario if not already set
         let customerName = data.customer_name;
         if (!customerName && data.destinatario) {
-          customerName = data.destinatario.nome ||
-                        data.destinatario.xNome ||
-                        data.destinatario.razao_social ||
-                        data.destinatario.xFant ||
-                        null;
+          customerName = data.destinatario.nome || data.destinatario.razao_social || null;
         }
 
-        // Extract CPF/CNPJ
-        let customerDocument = null;
-        if (data.destinatario) {
-          customerDocument = data.destinatario.cpf ||
-                           data.destinatario.CPF ||
-                           data.destinatario.cnpj ||
-                           data.destinatario.CNPJ ||
-                           null;
-        }
-
-        // Get invoice number from various sources
+        // Get invoice number from raw_response or numero field
         let numero = data.numero;
-
-        // Try to get from raw_response
-        if (!numero && data.raw_response) {
-          numero = data.raw_response.numero || data.raw_response.numero_nfe;
-        }
-
-        // If still no number, generate a temporary one from nfe_id or doc id
-        if (!numero) {
-          if (data.nfe_id) {
-            numero = `NFe-${data.nfe_id.substring(0, 8)}`;
-          } else {
-            numero = `INV-${doc.id.substring(0, 8)}`;
-          }
+        if (!numero && data.raw_response?.numero) {
+          numero = data.raw_response.numero;
         }
 
         // Convert Firestore Timestamp to ISO string for date formatting
@@ -145,7 +118,6 @@ export default function Dashboard() {
           // Map fields for InvoiceTable component compatibility
           issued_at: issuedAt,
           customer_name: customerName,
-          customer_document: customerDocument,
           numero: numero || "—",
           total_value: data.total_value || data.valor_total || 0
         };
@@ -332,158 +304,6 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
-
-      {/* Invoice Details Modal */}
-      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Invoice Details</DialogTitle>
-            <DialogDescription>
-              Detailed information about invoice {selectedInvoice?.numero || selectedInvoice?.id}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedInvoice && (
-            <div className="space-y-6">
-              {/* Basic Information */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-semibold text-muted-foreground">Invoice Number</label>
-                  <p className="text-base">{selectedInvoice.numero || "—"}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-muted-foreground">Status</label>
-                  <p className="text-base capitalize">{selectedInvoice.status || "—"}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-muted-foreground">Total Value</label>
-                  <p className="text-base">
-                    {new Intl.NumberFormat("pt-BR", {
-                      style: "currency",
-                      currency: "BRL",
-                    }).format(Number(selectedInvoice.total_value || selectedInvoice.valor_total || 0))}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-muted-foreground">Date</label>
-                  <p className="text-base">
-                    {selectedInvoice.issued_at && !isNaN(new Date(selectedInvoice.issued_at).getTime())
-                      ? format(new Date(selectedInvoice.issued_at), "dd/MM/yyyy HH:mm")
-                      : "—"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Customer Information */}
-              {selectedInvoice.destinatario && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Customer Information</h3>
-                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
-                    <div>
-                      <label className="text-sm font-semibold text-muted-foreground">Name</label>
-                      <p className="text-base">
-                        {selectedInvoice.customer_name ||
-                         selectedInvoice.destinatario?.nome ||
-                         selectedInvoice.destinatario?.xNome ||
-                         selectedInvoice.destinatario?.razao_social ||
-                         selectedInvoice.destinatario?.xFant ||
-                         "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-muted-foreground">CPF/CNPJ</label>
-                      <p className="text-base">
-                        {selectedInvoice.customer_document ||
-                         selectedInvoice.destinatario?.cpf ||
-                         selectedInvoice.destinatario?.CPF ||
-                         selectedInvoice.destinatario?.cnpj ||
-                         selectedInvoice.destinatario?.CNPJ ||
-                         "—"}
-                      </p>
-                    </div>
-                    {selectedInvoice.destinatario.email && (
-                      <div>
-                        <label className="text-sm font-semibold text-muted-foreground">Email</label>
-                        <p className="text-base">{selectedInvoice.destinatario.email}</p>
-                      </div>
-                    )}
-                    {selectedInvoice.destinatario.telefone && (
-                      <div>
-                        <label className="text-sm font-semibold text-muted-foreground">Phone</label>
-                        <p className="text-base">{selectedInvoice.destinatario.telefone}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Products */}
-              {selectedInvoice.produtos && selectedInvoice.produtos.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Products</h3>
-                  <div className="space-y-3">
-                    {selectedInvoice.produtos.map((produto: any, index: number) => (
-                      <div key={index} className="bg-muted/30 p-4 rounded-lg">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                          <div className="col-span-2">
-                            <label className="text-sm font-semibold text-muted-foreground">Description</label>
-                            <p className="text-base">{produto.descricao || "—"}</p>
-                          </div>
-                          <div>
-                            <label className="text-sm font-semibold text-muted-foreground">Code</label>
-                            <p className="text-base">{produto.codigo || "—"}</p>
-                          </div>
-                          <div>
-                            <label className="text-sm font-semibold text-muted-foreground">Quantity</label>
-                            <p className="text-base">{produto.quantidade || 0}</p>
-                          </div>
-                          <div>
-                            <label className="text-sm font-semibold text-muted-foreground">Unit Price</label>
-                            <p className="text-base">
-                              {new Intl.NumberFormat("pt-BR", {
-                                style: "currency",
-                                currency: "BRL",
-                              }).format(Number(produto.valor_unitario || 0))}
-                            </p>
-                          </div>
-                          <div>
-                            <label className="text-sm font-semibold text-muted-foreground">Total</label>
-                            <p className="text-base font-semibold">
-                              {new Intl.NumberFormat("pt-BR", {
-                                style: "currency",
-                                currency: "BRL",
-                              }).format(Number(produto.valor_total || 0))}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* API Response Data (for debugging) */}
-              {selectedInvoice.raw_response && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">API Information</h3>
-                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-lg">
-                    <div>
-                      <label className="text-sm font-semibold text-muted-foreground">NF-e ID</label>
-                      <p className="text-sm font-mono">{selectedInvoice.nfe_id || "—"}</p>
-                    </div>
-                    {selectedInvoice.raw_response.chave_acesso && (
-                      <div className="col-span-2">
-                        <label className="text-sm font-semibold text-muted-foreground">Access Key</label>
-                        <p className="text-sm font-mono break-all">{selectedInvoice.raw_response.chave_acesso}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

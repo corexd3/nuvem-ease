@@ -40,7 +40,7 @@ async function getNuvemFiscalToken() {
 }
 // Issue NF-e
 exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w;
     try {
         console.log('=== issueNFe_sandbox called ===');
         if (!request.auth) {
@@ -243,16 +243,21 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
         console.log('NuvemFiscal response:', result.data);
         // Save to Firestore
         const invoiceRef = db.collection("invoices").doc();
+        const totalValue = data.produtos.reduce((sum, p) => sum + p.valor_total, 0);
         await invoiceRef.set({
             user_id: uid,
             nfe_id: result.data.id,
             invoice_type: "nfe", // Changed from 'type' to 'invoice_type' to match dashboard
             status: result.data.status || "processing",
+            numero: result.data.numero || "Processando...",
             emittente: data.emittente,
             destinatario: data.destinatario,
+            customer_name: ((_p = data.destinatario) === null || _p === void 0 ? void 0 : _p.nome) || ((_q = data.destinatario) === null || _q === void 0 ? void 0 : _q.razao_social) || null,
             produtos: data.produtos,
-            valor_total: data.produtos.reduce((sum, p) => sum + p.valor_total, 0),
-            created_at: firebase_admin_1.default.firestore.FieldValue.serverTimestamp()
+            valor_total: totalValue,
+            total_value: totalValue, // Add alias for compatibility
+            created_at: firebase_admin_1.default.firestore.FieldValue.serverTimestamp(),
+            raw_response: result.data // Store full API response for reference
         });
         return {
             success: true,
@@ -264,11 +269,11 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
     catch (error) {
         console.error('NF-e creation error:', {
             message: error.message,
-            response: (_p = error.response) === null || _p === void 0 ? void 0 : _p.data,
-            errors: JSON.stringify((_s = (_r = (_q = error.response) === null || _q === void 0 ? void 0 : _q.data) === null || _r === void 0 ? void 0 : _r.error) === null || _s === void 0 ? void 0 : _s.errors, null, 2),
-            status: (_t = error.response) === null || _t === void 0 ? void 0 : _t.status
+            response: (_r = error.response) === null || _r === void 0 ? void 0 : _r.data,
+            errors: JSON.stringify((_u = (_t = (_s = error.response) === null || _s === void 0 ? void 0 : _s.data) === null || _t === void 0 ? void 0 : _t.error) === null || _u === void 0 ? void 0 : _u.errors, null, 2),
+            status: (_v = error.response) === null || _v === void 0 ? void 0 : _v.status
         });
-        throw new https_1.HttpsError('internal', 'Failed to issue NF-e', ((_u = error.response) === null || _u === void 0 ? void 0 : _u.data) || error.message);
+        throw new https_1.HttpsError('internal', 'Failed to issue NF-e', ((_w = error.response) === null || _w === void 0 ? void 0 : _w.data) || error.message);
     }
 });
 // Query invoice status
