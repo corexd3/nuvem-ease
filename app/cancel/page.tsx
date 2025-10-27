@@ -15,6 +15,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, XCircle, AlertTriangle } from "lucide-react";
 
+interface CancelInvoiceResponse {
+  success: boolean;
+  error?: {
+    code: string;
+    message: string;
+    currentStatus?: string;
+  };
+  data?: any;
+}
+
 export default function CancelPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -61,7 +71,7 @@ export default function CancelPage() {
       const response = await handleCancelInvoice({
         invoice_id: invoiceId,
         justificativa
-      });
+      }) as CancelInvoiceResponse;
 
       // Check if the response indicates a validation error (not a thrown error)
       if (response && !response.success && response.error) {
