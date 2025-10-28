@@ -118,7 +118,9 @@ export const issueNFe_sandbox = onCall(async (request) => {
                         xPais: data.emittente.endereco.pais || "Brasil",
                         fone: data.emittente.endereco.telefone?.replace(/[^\d]/g, '') || undefined
                     },
-                    IE: data.emittente.inscricao_estadual,
+                    IE: data.emittente.inscricao_estadual && data.emittente.inscricao_estadual.trim() !== ""
+                        ? data.emittente.inscricao_estadual.replace(/[^\d]/g, '')
+                        : undefined,
                     CRT: parseInt(data.emittente.regime_tributario || "1")
                 },
 
@@ -143,7 +145,9 @@ export const issueNFe_sandbox = onCall(async (request) => {
                         fone: data.destinatario.telefone?.replace(/[^\d]/g, '') || undefined
                     },
                     indIEDest: parseInt(data.destinatario.indicador_ie || "9"),
-                    IE: data.destinatario.inscricao_estadual || undefined,
+                    IE: data.destinatario.inscricao_estadual && data.destinatario.inscricao_estadual.trim() !== ""
+                        ? data.destinatario.inscricao_estadual.replace(/[^\d]/g, '')
+                        : undefined,
                     email: data.destinatario.email || undefined
                 },
 

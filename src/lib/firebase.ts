@@ -34,15 +34,31 @@ export const handleIssueNFe = async (data: any) => {
 }
 
 export const handleQueryInvoice = async (data: any) => {
-  const queryInvoice = httpsCallable(functions, 'queryInvoice_sandbox');
-  const result = await queryInvoice(data);
-  return result.data;
+  const queryInvoice = httpsCallable(functions, 'queryInvoice_sandbox', {
+    timeout: 60000 // 60 second timeout
+  });
+  try {
+    const result = await queryInvoice(data);
+    return result.data;
+  } catch (error: any) {
+    console.error('handleQueryInvoice error:', error);
+    // Re-throw with more context
+    throw new Error(error.message || 'Failed to query invoice');
+  }
 }
 
 export const handleCancelInvoice = async (data: any) => {
-  const cancelInvoice = httpsCallable(functions, 'cancelInvoice_sandbox');
-  const result = await cancelInvoice(data);
-  return result.data;
+  const cancelInvoice = httpsCallable(functions, 'cancelInvoice_sandbox', {
+    timeout: 60000 // 60 second timeout
+  });
+  try {
+    const result = await cancelInvoice(data);
+    return result.data;
+  } catch (error: any) {
+    console.error('handleCancelInvoice error:', error);
+    // Re-throw with more context
+    throw new Error(error.message || 'Failed to cancel invoice');
+  }
 }
 
 export const handleGenerateInvoicePDF = async (data: any) => {

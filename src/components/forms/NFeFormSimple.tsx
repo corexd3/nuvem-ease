@@ -33,12 +33,20 @@ interface Product {
   cofins_situacao_tributaria?: string;
 }
 
+interface FieldError {
+  field: string;
+  message: string;
+  example?: string;
+}
+
 export function NFeFormSimple() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
+  const [fieldErrors, setFieldErrors] = useState<Record<string, FieldError>>({});
+  const [showValidation, setShowValidation] = useState(false);
 
   // NF-e Identification
   const [nfeConfig, setNfeConfig] = useState({
@@ -218,8 +226,347 @@ export function NFeFormSimple() {
     return produtos.reduce((sum, p) => sum + p.valor_total, 0);
   };
 
+  const FieldErrorMessage = ({ fieldName }: { fieldName: string }) => {
+    if (!showValidation || !fieldErrors[fieldName]) return null;
+
+    const error = fieldErrors[fieldName];
+    return (
+      <div className="mt-1 text-sm text-red-600 dark:text-red-400">
+        <p>{error.message}</p>
+        {error.example && (
+          <p className="text-xs text-muted-foreground mt-0.5">{error.example}</p>
+        )}
+      </div>
+    );
+  };
+
+  const validateCPF = (cpf: string): boolean => {
+    const cleaned = cpf.replace(/\D/g, '');
+    if (cleaned.length !== 11) return false;
+
+    // Check for known invalid CPFs
+    if (/^(\d)\1{10}$/.test(cleaned)) return false;
+
+    // Validate check digits
+    let sum = 0;
+    for (let i = 0; i < 9; i++) {
+      sum += parseInt(cleaned.charAt(i)) * (10 - i);
+    }
+    let digit = 11 - (sum % 11);
+    if (digit >= 10) digit = 0;
+    if (digit !== parseInt(cleaned.charAt(9))) return false;
+
+    sum = 0;
+    for (let i = 0; i < 10; i++) {
+      sum += parseInt(cleaned.charAt(i)) * (11 - i);
+    }
+    digit = 11 - (sum % 11);
+    if (digit >= 10) digit = 0;
+    if (digit !== parseInt(cleaned.charAt(10))) return false;
+
+    return true;
+  };
+
+  const validateCNPJ = (cnpj: string): boolean => {
+    const cleaned = cnpj.replace(/\D/g, '');
+    if (cleaned.length !== 14) return false;
+
+    // Check for known invalid CNPJs
+    if (/^(\d)\1{13}$/.test(cleaned)) return false;
+
+    // Validate first check digit
+    let sum = 0;
+    let weight = 2;
+    for (let i = 11; i >= 0; i--) {
+      sum += parseInt(cleaned.charAt(i)) * weight;
+      weight = weight === 9 ? 2 : weight + 1;
+    }
+    let digit = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (digit !== parseInt(cleaned.charAt(12))) return false;
+
+    // Validate second check digit
+    sum = 0;
+    weight = 2;
+    for (let i = 12; i >= 0; i--) {
+      sum += parseInt(cleaned.charAt(i)) * weight;
+      weight = weight === 9 ? 2 : weight + 1;
+    }
+    digit = sum % 11 < 2 ? 0 : 11 - (sum % 11);
+    if (digit !== parseInt(cleaned.charAt(13))) return false;
+
+    return true;
+  };
+
+  const validateCPFCNPJ = (value: string): boolean => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length === 11) return validateCPF(cleaned);
+    if (cleaned.length === 14) return validateCNPJ(cleaned);
+    return false;
+  };
+
+  const validateNCM = (ncm: string): boolean => {
+    const cleaned = ncm.replace(/\D/g, '');
+    return cleaned.length === 8;
+  };
+
+  const validateCFOP = (cfop: string): boolean => {
+    const cleaned = cfop.replace(/\D/g, '');
+    if (cleaned.length !== 4) return false;
+
+    // CFOP must start with 1-7 (valid operation types)
+    const firstDigit = parseInt(cleaned.charAt(0));
+    if (firstDigit < 1 || firstDigit > 7) return false;
+
+    return true;
+  };
+
+  const validateCEP = (cep: string): boolean => {
+    const cleaned = cep.replace(/\D/g, '');
+    return cleaned.length === 8;
+  };
+
+  const validateIE = (ie: string): boolean => {
+    // IE is optional, but if provided must be 2-14 digits
+    if (!ie || ie.trim() === '') return true; // Optional field
+    const cleaned = ie.replace(/\D/g, '');
+    return cleaned.length >= 2 && cleaned.length <= 14;
+  };
+
+  const validateEmail = (email: string): boolean => {
+    // Email is optional, but if provided must be valid
+    if (!email || email.trim() === '') return true; // Optional field
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    // Phone is optional, but if provided must be 10-11 digits
+    if (!phone || phone.trim() === '') return true; // Optional field
+    const cleaned = phone.replace(/\D/g, '');
+    return cleaned.length >= 10 && cleaned.length <= 11;
+  };
+
+  const validateForm = (): { valid: boolean; errors: string[]; fieldErrors: Record<string, FieldError> } => {
+    const errors: string[] = [];
+    const newFieldErrors: Record<string, FieldError> = {};
+
+    // Validate Emittente (Issuer)
+    if (!emittente.cpf_cnpj || !validateCPFCNPJ(emittente.cpf_cnpj)) {
+      const msg = "CPF/CNPJ is required (11 or 14 digits)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.cpf_cnpj'] = { field: 'emittente.cpf_cnpj', message: msg, example: 'Example: 12.345.678/0001-90' };
+    }
+    if (!emittente.razao_social || emittente.razao_social.trim().length < 3) {
+      const msg = "Company name is required (minimum 3 characters)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.razao_social'] = { field: 'emittente.razao_social', message: msg, example: 'Example: Empresa XYZ Ltda' };
+    }
+    if (!validateIE(emittente.inscricao_estadual)) {
+      const msg = "State registration (IE) must be 2-14 digits (optional)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.inscricao_estadual'] = { field: 'emittente.inscricao_estadual', message: msg, example: 'Example: 123456789 or leave empty if exempt' };
+    }
+    if (!validatePhone(emittente.endereco.telefone)) {
+      const msg = "Phone must be 10-11 digits (optional)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.telefone'] = { field: 'emittente.endereco.telefone', message: msg, example: 'Example: (11) 98765-4321' };
+    }
+    if (!emittente.endereco.logradouro) {
+      const msg = "Street address is required";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.logradouro'] = { field: 'emittente.endereco.logradouro', message: msg, example: 'Example: Rua das Flores' };
+    }
+    if (!emittente.endereco.numero) {
+      const msg = "Address number is required";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.numero'] = { field: 'emittente.endereco.numero', message: msg, example: 'Example: 123' };
+    }
+    if (!emittente.endereco.bairro || emittente.endereco.bairro.trim().length < 2) {
+      const msg = "Neighborhood is required (minimum 2 characters)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.bairro'] = { field: 'emittente.endereco.bairro', message: msg, example: 'Example: Centro' };
+    }
+    if (!emittente.endereco.codigo_municipio || emittente.endereco.codigo_municipio.length !== 7) {
+      const msg = "City code is required (7 digits)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.codigo_municipio'] = { field: 'emittente.endereco.codigo_municipio', message: msg, example: 'Example: 3550308' };
+    }
+    if (!emittente.endereco.cidade) {
+      const msg = "City is required";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.cidade'] = { field: 'emittente.endereco.cidade', message: msg, example: 'Example: São Paulo' };
+    }
+    if (!emittente.endereco.uf || emittente.endereco.uf.length !== 2) {
+      const msg = "State (UF) is required (2 letters)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.uf'] = { field: 'emittente.endereco.uf', message: msg, example: 'Example: SP' };
+    }
+    if (!emittente.endereco.cep || !validateCEP(emittente.endereco.cep)) {
+      const msg = "CEP is required (8 digits)";
+      errors.push("Issuer " + msg);
+      newFieldErrors['emittente.endereco.cep'] = { field: 'emittente.endereco.cep', message: msg, example: 'Example: 01310-100' };
+    }
+
+    // Validate Destinatario (Customer)
+    if (!destinatario.cpf_cnpj || !validateCPFCNPJ(destinatario.cpf_cnpj)) {
+      const msg = "CPF/CNPJ is required (11 or 14 digits)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.cpf_cnpj'] = { field: 'destinatario.cpf_cnpj', message: msg, example: 'Example: 123.456.789-00 or 12.345.678/0001-90' };
+    }
+    if (!destinatario.razao_social || destinatario.razao_social.trim().length < 3) {
+      const msg = "Name is required (minimum 3 characters)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.razao_social'] = { field: 'destinatario.razao_social', message: msg, example: 'Example: João Silva or Empresa ABC' };
+    }
+    if (!validateIE(destinatario.inscricao_estadual)) {
+      const msg = "State registration (IE) must be 2-14 digits (optional)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.inscricao_estadual'] = { field: 'destinatario.inscricao_estadual', message: msg, example: 'Example: 123456789 or leave empty if exempt' };
+    }
+    if (!validateEmail(destinatario.email)) {
+      const msg = "Email must be valid (optional)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.email'] = { field: 'destinatario.email', message: msg, example: 'Example: cliente@empresa.com.br' };
+    }
+    if (!validatePhone(destinatario.telefone)) {
+      const msg = "Phone must be 10-11 digits (optional)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.telefone'] = { field: 'destinatario.telefone', message: msg, example: 'Example: (11) 98765-4321' };
+    }
+    if (!destinatario.endereco.logradouro) {
+      const msg = "Street address is required";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.endereco.logradouro'] = { field: 'destinatario.endereco.logradouro', message: msg, example: 'Example: Avenida Paulista' };
+    }
+    if (!destinatario.endereco.numero) {
+      const msg = "Address number is required";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.endereco.numero'] = { field: 'destinatario.endereco.numero', message: msg, example: 'Example: 1578' };
+    }
+    if (!destinatario.endereco.bairro || destinatario.endereco.bairro.trim().length < 2) {
+      const msg = "Neighborhood is required (minimum 2 characters)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.endereco.bairro'] = { field: 'destinatario.endereco.bairro', message: msg, example: 'Example: Bela Vista' };
+    }
+    if (!destinatario.endereco.codigo_municipio || destinatario.endereco.codigo_municipio.length !== 7) {
+      const msg = "City code is required (7 digits)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.endereco.codigo_municipio'] = { field: 'destinatario.endereco.codigo_municipio', message: msg, example: 'Example: 3550308' };
+    }
+    if (!destinatario.endereco.cidade) {
+      const msg = "City is required";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.endereco.cidade'] = { field: 'destinatario.endereco.cidade', message: msg, example: 'Example: São Paulo' };
+    }
+    if (!destinatario.endereco.uf || destinatario.endereco.uf.length !== 2) {
+      const msg = "State (UF) is required (2 letters)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.endereco.uf'] = { field: 'destinatario.endereco.uf', message: msg, example: 'Example: SP' };
+    }
+    if (!destinatario.endereco.cep || !validateCEP(destinatario.endereco.cep)) {
+      const msg = "CEP is required (8 digits)";
+      errors.push("Customer " + msg);
+      newFieldErrors['destinatario.endereco.cep'] = { field: 'destinatario.endereco.cep', message: msg, example: 'Example: 01310-100' };
+    }
+
+    // Validate Products
+    if (produtos.length === 0) {
+      errors.push("At least one product is required");
+    }
+
+    produtos.forEach((produto, index) => {
+      const itemNum = index + 1;
+
+      if (!produto.codigo || produto.codigo.trim().length === 0) {
+        const msg = "Code is required";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.codigo`] = { field: `produtos.${index}.codigo`, message: msg, example: 'Example: PROD001' };
+      }
+      if (!produto.descricao || produto.descricao.trim().length < 3) {
+        const msg = "Description is required (minimum 3 characters)";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.descricao`] = { field: `produtos.${index}.descricao`, message: msg, example: 'Example: Notebook Dell Inspiron' };
+      }
+      if (!produto.ncm || !validateNCM(produto.ncm)) {
+        const msg = "NCM is required (8 digits)";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.ncm`] = { field: `produtos.${index}.ncm`, message: msg, example: 'Example: 85171231' };
+      }
+      if (!produto.cfop || !validateCFOP(produto.cfop)) {
+        const msg = "CFOP is required (4 digits)";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.cfop`] = { field: `produtos.${index}.cfop`, message: msg, example: 'Example: 5102' };
+      }
+      if (!produto.unidade || produto.unidade.trim().length === 0) {
+        const msg = "Unit is required";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.unidade`] = { field: `produtos.${index}.unidade`, message: msg, example: 'Example: UN, KG, M' };
+      }
+      if (produto.quantidade <= 0) {
+        const msg = "Quantity must be greater than 0";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.quantidade`] = { field: `produtos.${index}.quantidade`, message: msg, example: 'Example: 1, 2.5, 10' };
+      }
+      if (produto.valor_unitario <= 0) {
+        const msg = "Unit price must be greater than 0";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.valor_unitario`] = { field: `produtos.${index}.valor_unitario`, message: msg, example: 'Example: 150.00' };
+      }
+      if (produto.valor_total <= 0) {
+        const msg = "Total value must be greater than 0";
+        errors.push(`Product ${itemNum}: ${msg}`);
+        newFieldErrors[`produtos.${index}.valor_total`] = { field: `produtos.${index}.valor_total`, message: msg, example: 'Example: 300.00' };
+      }
+    });
+
+    // Validate total value
+    const total = calculateTotal();
+    if (total <= 0) {
+      errors.push("Invoice total must be greater than 0");
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      fieldErrors: newFieldErrors
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate form before submission
+    const validation = validateForm();
+    if (!validation.valid) {
+      // Set field errors to display inline
+      setFieldErrors(validation.fieldErrors);
+      setShowValidation(true);
+
+      toast({
+        title: "Validation Error",
+        description: (
+          <div className="space-y-1">
+            <p className="font-semibold">Please fix the following errors:</p>
+            <ul className="list-disc list-inside text-sm">
+              {validation.errors.slice(0, 5).map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+            {validation.errors.length > 5 && (
+              <p className="text-sm italic">...and {validation.errors.length - 5} more error(s)</p>
+            )}
+          </div>
+        ),
+        variant: "destructive",
+        duration: 8000,
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Clear errors if validation passes
+    setFieldErrors({});
+    setShowValidation(false);
     setLoading(true);
 
     try {
@@ -436,17 +783,21 @@ export function NFeFormSimple() {
                   <Input
                     value={emittente.cpf_cnpj}
                     onChange={(e) => setEmittente({ ...emittente, cpf_cnpj: e.target.value })}
-                    placeholder="00.000.000/0000-00"
+                    placeholder="12.345.678/0001-90"
                     required
+                    className={showValidation && fieldErrors['emittente.cpf_cnpj'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.cpf_cnpj" />
                 </div>
                 <div>
-                  <Label>State Registration *</Label>
+                  <Label>State Registration (IE)</Label>
                   <Input
                     value={emittente.inscricao_estadual}
                     onChange={(e) => setEmittente({ ...emittente, inscricao_estadual: e.target.value })}
-                    required
+                    placeholder="123456789 (optional, 2-14 digits)"
+                    className={showValidation && fieldErrors['emittente.inscricao_estadual'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.inscricao_estadual" />
                 </div>
                 <div>
                   <Label>Tax Regime *</Label>
@@ -471,14 +822,18 @@ export function NFeFormSimple() {
                   <Input
                     value={emittente.razao_social}
                     onChange={(e) => setEmittente({ ...emittente, razao_social: e.target.value })}
+                    placeholder="Empresa XYZ Ltda"
                     required
+                    className={showValidation && fieldErrors['emittente.razao_social'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.razao_social" />
                 </div>
                 <div>
                   <Label>Trade Name</Label>
                   <Input
                     value={emittente.nome_fantasia}
                     onChange={(e) => setEmittente({ ...emittente, nome_fantasia: e.target.value })}
+                    placeholder="XYZ Store"
                   />
                 </div>
               </div>
@@ -488,22 +843,29 @@ export function NFeFormSimple() {
                   <Input
                     value={emittente.endereco.logradouro}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, logradouro: e.target.value }})}
+                    placeholder="Rua das Flores"
                     required
+                    className={showValidation && fieldErrors['emittente.endereco.logradouro'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.endereco.logradouro" />
                 </div>
                 <div>
                   <Label>Number *</Label>
                   <Input
                     value={emittente.endereco.numero}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, numero: e.target.value }})}
+                    placeholder="123"
                     required
+                    className={showValidation && fieldErrors['emittente.endereco.numero'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.endereco.numero" />
                 </div>
                 <div>
                   <Label>Complement</Label>
                   <Input
                     value={emittente.endereco.complemento}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, complemento: e.target.value }})}
+                    placeholder="Apt 101"
                   />
                 </div>
               </div>
@@ -513,16 +875,22 @@ export function NFeFormSimple() {
                   <Input
                     value={emittente.endereco.bairro}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, bairro: e.target.value }})}
+                    placeholder="Centro"
                     required
+                    className={showValidation && fieldErrors['emittente.endereco.bairro'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.endereco.bairro" />
                 </div>
                 <div>
                   <Label>City *</Label>
                   <Input
                     value={emittente.endereco.cidade}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, cidade: e.target.value }})}
+                    placeholder="São Paulo"
                     required
+                    className={showValidation && fieldErrors['emittente.endereco.cidade'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.endereco.cidade" />
                 </div>
                 <div>
                   <Label>UF *</Label>
@@ -530,23 +898,43 @@ export function NFeFormSimple() {
                     value={emittente.endereco.uf}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, uf: e.target.value.toUpperCase() }})}
                     maxLength={2}
+                    placeholder="SP"
                     required
+                    className={showValidation && fieldErrors['emittente.endereco.uf'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.endereco.uf" />
                 </div>
                 <div>
                   <Label>CEP *</Label>
                   <Input
                     value={emittente.endereco.cep}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, cep: e.target.value }})}
+                    placeholder="01310-100"
                     required
+                    className={showValidation && fieldErrors['emittente.endereco.cep'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.endereco.cep" />
                 </div>
                 <div>
                   <Label>Phone</Label>
                   <Input
                     value={emittente.endereco.telefone}
                     onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, telefone: e.target.value }})}
+                    placeholder="(11) 98765-4321"
+                    className={showValidation && fieldErrors['emittente.endereco.telefone'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="emittente.endereco.telefone" />
+                </div>
+                <div>
+                  <Label>City Code *</Label>
+                  <Input
+                    value={emittente.endereco.codigo_municipio}
+                    onChange={(e) => setEmittente({ ...emittente, endereco: { ...emittente.endereco, codigo_municipio: e.target.value }})}
+                    placeholder="3550308"
+                    required
+                    className={showValidation && fieldErrors['emittente.endereco.codigo_municipio'] ? 'border-red-500' : ''}
+                  />
+                  <FieldErrorMessage fieldName="emittente.endereco.codigo_municipio" />
                 </div>
               </div>
             </CardContent>
@@ -567,16 +955,22 @@ export function NFeFormSimple() {
                   <Input
                     value={destinatario.cpf_cnpj}
                     onChange={(e) => setDestinatario({ ...destinatario, cpf_cnpj: e.target.value })}
+                    placeholder="123.456.789-00"
                     required
+                    className={showValidation && fieldErrors['destinatario.cpf_cnpj'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.cpf_cnpj" />
                 </div>
                 <div className="col-span-2">
                   <Label>Name *</Label>
                   <Input
                     value={destinatario.razao_social}
+                    placeholder="João Silva"
+                    className={showValidation && fieldErrors['destinatario.razao_social'] ? 'border-red-500' : ''}
                     onChange={(e) => setDestinatario({ ...destinatario, razao_social: e.target.value })}
                     required
                   />
+                  <FieldErrorMessage fieldName="destinatario.razao_social" />
                 </div>
                 <div>
                   <Label>IE Indicator *</Label>
@@ -597,11 +991,14 @@ export function NFeFormSimple() {
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label>State Registration</Label>
+                  <Label>State Registration (IE)</Label>
                   <Input
                     value={destinatario.inscricao_estadual}
                     onChange={(e) => setDestinatario({ ...destinatario, inscricao_estadual: e.target.value })}
+                    placeholder="123456789 (optional, 2-14 digits)"
+                    className={showValidation && fieldErrors['destinatario.inscricao_estadual'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.inscricao_estadual" />
                 </div>
                 <div>
                   <Label>Email</Label>
@@ -609,14 +1006,20 @@ export function NFeFormSimple() {
                     type="email"
                     value={destinatario.email}
                     onChange={(e) => setDestinatario({ ...destinatario, email: e.target.value })}
+                    placeholder="cliente@email.com"
+                    className={showValidation && fieldErrors['destinatario.email'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.email" />
                 </div>
                 <div>
                   <Label>Phone</Label>
                   <Input
                     value={destinatario.telefone}
                     onChange={(e) => setDestinatario({ ...destinatario, telefone: e.target.value })}
+                    placeholder="(11) 98765-4321"
+                    className={showValidation && fieldErrors['destinatario.telefone'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.telefone" />
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4">
@@ -625,22 +1028,29 @@ export function NFeFormSimple() {
                   <Input
                     value={destinatario.endereco.logradouro}
                     onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, logradouro: e.target.value }})}
+                    placeholder="Avenida Paulista"
                     required
+                    className={showValidation && fieldErrors['destinatario.endereco.logradouro'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.endereco.logradouro" />
                 </div>
                 <div>
                   <Label>Number *</Label>
                   <Input
                     value={destinatario.endereco.numero}
                     onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, numero: e.target.value }})}
+                    placeholder="1578"
                     required
+                    className={showValidation && fieldErrors['destinatario.endereco.numero'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.endereco.numero" />
                 </div>
                 <div>
                   <Label>Complement</Label>
                   <Input
                     value={destinatario.endereco.complemento}
                     onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, complemento: e.target.value }})}
+                    placeholder="Apto 205"
                   />
                 </div>
               </div>
@@ -650,16 +1060,22 @@ export function NFeFormSimple() {
                   <Input
                     value={destinatario.endereco.bairro}
                     onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, bairro: e.target.value }})}
+                    placeholder="Bela Vista"
                     required
+                    className={showValidation && fieldErrors['destinatario.endereco.bairro'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.endereco.bairro" />
                 </div>
                 <div>
                   <Label>City *</Label>
                   <Input
                     value={destinatario.endereco.cidade}
                     onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, cidade: e.target.value }})}
+                    placeholder="São Paulo"
                     required
+                    className={showValidation && fieldErrors['destinatario.endereco.cidade'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.endereco.cidade" />
                 </div>
                 <div>
                   <Label>UF *</Label>
@@ -667,16 +1083,35 @@ export function NFeFormSimple() {
                     value={destinatario.endereco.uf}
                     onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, uf: e.target.value.toUpperCase() }})}
                     maxLength={2}
+                    placeholder="SP"
                     required
+                    className={showValidation && fieldErrors['destinatario.endereco.uf'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.endereco.uf" />
                 </div>
                 <div>
                   <Label>CEP *</Label>
                   <Input
                     value={destinatario.endereco.cep}
                     onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, cep: e.target.value }})}
+                    placeholder="01310-100"
                     required
+                    className={showValidation && fieldErrors['destinatario.endereco.cep'] ? 'border-red-500' : ''}
                   />
+                  <FieldErrorMessage fieldName="destinatario.endereco.cep" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>City Code *</Label>
+                  <Input
+                    value={destinatario.endereco.codigo_municipio}
+                    onChange={(e) => setDestinatario({ ...destinatario, endereco: { ...destinatario.endereco, codigo_municipio: e.target.value }})}
+                    placeholder="3550308"
+                    required
+                    className={showValidation && fieldErrors['destinatario.endereco.codigo_municipio'] ? 'border-red-500' : ''}
+                  />
+                  <FieldErrorMessage fieldName="destinatario.endereco.codigo_municipio" />
                 </div>
               </div>
             </CardContent>
@@ -710,42 +1145,56 @@ export function NFeFormSimple() {
                             <Input
                               value={produto.codigo}
                               onChange={(e) => updateProduct(index, 'codigo', e.target.value)}
+                              placeholder="PROD001"
                               required
                               size={10}
+                              className={showValidation && fieldErrors[`produtos.${index}.codigo`] ? 'border-red-500' : ''}
                             />
+                            <FieldErrorMessage fieldName={`produtos.${index}.codigo`} />
                           </div>
                           <div className="col-span-2">
                             <Label className="text-xs">Description *</Label>
                             <Input
                               value={produto.descricao}
                               onChange={(e) => updateProduct(index, 'descricao', e.target.value)}
+                              placeholder="Notebook Dell Inspiron"
                               required
+                              className={showValidation && fieldErrors[`produtos.${index}.descricao`] ? 'border-red-500' : ''}
                             />
+                            <FieldErrorMessage fieldName={`produtos.${index}.descricao`} />
                           </div>
                           <div>
                             <Label className="text-xs">NCM *</Label>
                             <Input
                               value={produto.ncm}
                               onChange={(e) => updateProduct(index, 'ncm', e.target.value)}
-                              placeholder="00000000"
+                              placeholder="85171231"
                               required
+                              className={showValidation && fieldErrors[`produtos.${index}.ncm`] ? 'border-red-500' : ''}
                             />
+                            <FieldErrorMessage fieldName={`produtos.${index}.ncm`} />
                           </div>
                           <div>
                             <Label className="text-xs">CFOP *</Label>
                             <Input
                               value={produto.cfop}
                               onChange={(e) => updateProduct(index, 'cfop', e.target.value)}
+                              placeholder="5102"
                               required
+                              className={showValidation && fieldErrors[`produtos.${index}.cfop`] ? 'border-red-500' : ''}
                             />
+                            <FieldErrorMessage fieldName={`produtos.${index}.cfop`} />
                           </div>
                           <div>
                             <Label className="text-xs">Unit *</Label>
                             <Input
                               value={produto.unidade}
                               onChange={(e) => updateProduct(index, 'unidade', e.target.value)}
+                              placeholder="UN"
                               required
+                              className={showValidation && fieldErrors[`produtos.${index}.unidade`] ? 'border-red-500' : ''}
                             />
+                            <FieldErrorMessage fieldName={`produtos.${index}.unidade`} />
                           </div>
                         </div>
                         <div className="grid grid-cols-6 gap-3">
@@ -757,8 +1206,11 @@ export function NFeFormSimple() {
                               onChange={(e) => updateProduct(index, 'quantidade', parseFloat(e.target.value) || 0)}
                               min="0"
                               step="0.01"
+                              placeholder="1"
                               required
+                              className={showValidation && fieldErrors[`produtos.${index}.quantidade`] ? 'border-red-500' : ''}
                             />
+                            <FieldErrorMessage fieldName={`produtos.${index}.quantidade`} />
                           </div>
                           <div>
                             <Label className="text-xs">Unit Price *</Label>
@@ -768,8 +1220,11 @@ export function NFeFormSimple() {
                               onChange={(e) => updateProduct(index, 'valor_unitario', parseFloat(e.target.value) || 0)}
                               min="0"
                               step="0.01"
+                              placeholder="150.00"
                               required
+                              className={showValidation && fieldErrors[`produtos.${index}.valor_unitario`] ? 'border-red-500' : ''}
                             />
+                            <FieldErrorMessage fieldName={`produtos.${index}.valor_unitario`} />
                           </div>
                           <div>
                             <Label className="text-xs">Total</Label>

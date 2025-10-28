@@ -15,6 +15,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, XCircle, AlertTriangle } from "lucide-react";
 
+interface CancelInvoiceResponse {
+  success: boolean;
+  error?: {
+    code: string;
+    message: string;
+    currentStatus?: string;
+  };
+  data?: any;
+}
+
+interface FieldErrors {
+  invoiceId?: { message: string; example?: string };
+  justificativa?: { message: string; example?: string };
+}
+
 export default function CancelPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -25,6 +40,8 @@ export default function CancelPage() {
   const [justificativa, setJustificativa] = useState("");
   const [result, setResult] = useState<any>(null);
   const mountedRef = useRef(true);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [showValidation, setShowValidation] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -42,14 +59,55 @@ export default function CancelPage() {
     };
   }, [router]);
 
+  const validateForm = (): boolean => {
+    const errors: FieldErrors = {};
+    let isValid = true;
+
+    // Validate invoice ID
+    if (!invoiceId || invoiceId.trim().length === 0) {
+      errors.invoiceId = {
+        message: "Invoice ID is required",
+        example: "Example: abc123def456 (Firestore document ID)"
+      };
+      isValid = false;
+    } else if (invoiceId.trim().length < 10) {
+      errors.invoiceId = {
+        message: "Invoice ID must be at least 10 characters",
+        example: "Example: abc123def456ghi789 (valid Firestore ID)"
+      };
+      isValid = false;
+    }
+
+    // Validate justification
+    if (!justificativa || justificativa.trim().length === 0) {
+      errors.justificativa = {
+        message: "Justification is required",
+        example: "Example: Cliente solicitou cancelamento da nota fiscal"
+      };
+      isValid = false;
+    } else if (justificativa.trim().length < 15) {
+      errors.justificativa = {
+        message: "Justification must be at least 15 characters",
+        example: "Example: Cliente solicitou cancelamento da nota fiscal por erro no pedido"
+      };
+      isValid = false;
+    }
+
+    setFieldErrors(errors);
+    setShowValidation(!isValid);
+    return isValid;
+  };
+
   const handleCancel = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (justificativa.length < 15) {
+    // Validate form
+    if (!validateForm()) {
       toast({
-        title: "❌ Validation Error",
-        description: "Justification must be at least 15 characters",
+        title: "Validation Error",
+        description: "Please fix the errors below",
         variant: "destructive",
+        duration: 4000,
       });
       return;
     }
@@ -58,59 +116,74 @@ export default function CancelPage() {
     setResult(null);
 
     try {
+      console.log('Starting cancellation for invoice:', invoiceId);
       const response = await handleCancelInvoice({
         invoice_id: invoiceId,
         justificativa
-      });
+      }) as CancelInvoiceResponse;
+      console.log('Cancel response received:', response);
 
-      // Check if the response indicates a validation error (not a thrown error)
-      if (response && !response.success && response.error) {
-        if (mountedRef.current) {
-          toast({
-            title: "❌ Cannot Cancel Invoice",
-            description: response.error.message,
-            variant: "destructive",
-            duration: 6000,
-          });
-          setResult(null);
-          setCancelling(false);
-        }
+      // Check mounted state after async operation
+      if (!mountedRef.current) {
+        console.log('Component unmounted, skipping state update');
         return;
       }
 
-      if (mountedRef.current) {
-        setResult(response);
-        toast({
-          title: "✅ Success",
-          description: "Invoice cancelled successfully",
-        });
-        setInvoiceId("");
-        setJustificativa("");
-      }
-    } catch (error: any) {
-      console.error("Cancellation error:", error);
-
-      if (mountedRef.current) {
-        // Extract detailed error message
-        let errorMessage = error.message || "Failed to cancel invoice";
-
-        // Check if there's a NuvemFiscal API error
-        if (error.details?.error?.message) {
-          errorMessage = `${errorMessage}: ${error.details.error.message}`;
-        }
-
+      // Check if the response indicates a validation error (not a thrown error)
+      if (response && !response.success && response.error) {
+        console.log('Cancellation validation error:', response.error);
         toast({
           title: "❌ Cannot Cancel Invoice",
-          description: errorMessage,
+          description: response.error.message,
           variant: "destructive",
           duration: 6000,
         });
-
         setResult(null);
+        return;
       }
+
+      // Success case
+      setResult(response);
+      toast({
+        title: "✅ Success",
+        description: "Invoice cancelled successfully",
+      });
+      setInvoiceId("");
+      setJustificativa("");
+    } catch (error: any) {
+      console.error("Cancellation error details:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        stack: error.stack
+      });
+
+      if (!mountedRef.current) {
+        console.log('Component unmounted, skipping error toast');
+        return;
+      }
+
+      // Extract detailed error message
+      let errorMessage = error.message || "Failed to cancel invoice";
+
+      // Check if there's a NuvemFiscal API error
+      if (error.details?.error?.message) {
+        errorMessage = `${errorMessage}: ${error.details.error.message}`;
+      }
+
+      toast({
+        title: "❌ Cannot Cancel Invoice",
+        description: errorMessage,
+        variant: "destructive",
+        duration: 6000,
+      });
+
+      setResult(null);
     } finally {
+      console.log('Cancel finally block, mounted:', mountedRef.current);
       if (mountedRef.current) {
         setCancelling(false);
+        console.log('Loading state reset');
       }
     }
   };
@@ -159,9 +232,18 @@ export default function CancelPage() {
                       id="invoiceId"
                       value={invoiceId}
                       onChange={(e) => setInvoiceId(e.target.value)}
-                      placeholder="Enter invoice ID from Firestore"
+                      placeholder="abc123def456ghi789"
                       required
+                      className={showValidation && fieldErrors.invoiceId ? 'border-red-500' : ''}
                     />
+                    {showValidation && fieldErrors.invoiceId && (
+                      <div className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        <p>{fieldErrors.invoiceId.message}</p>
+                        {fieldErrors.invoiceId.example && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{fieldErrors.invoiceId.example}</p>
+                        )}
+                      </div>
+                    )}
                     <p className="text-sm text-muted-foreground mt-1">
                       Find this ID in the Firestore &quot;invoices&quot; collection
                     </p>
@@ -173,10 +255,19 @@ export default function CancelPage() {
                       id="justificativa"
                       value={justificativa}
                       onChange={(e) => setJustificativa(e.target.value)}
-                      placeholder="Reason for cancellation"
+                      placeholder="Cliente solicitou cancelamento da nota fiscal"
                       required
                       minLength={15}
+                      className={showValidation && fieldErrors.justificativa ? 'border-red-500' : ''}
                     />
+                    {showValidation && fieldErrors.justificativa && (
+                      <div className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        <p>{fieldErrors.justificativa.message}</p>
+                        {fieldErrors.justificativa.example && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{fieldErrors.justificativa.example}</p>
+                        )}
+                      </div>
+                    )}
                     <p className="text-sm text-muted-foreground mt-1">
                       {justificativa.length}/15 characters minimum
                     </p>

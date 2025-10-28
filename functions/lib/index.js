@@ -107,7 +107,9 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                         xPais: data.emittente.endereco.pais || "Brasil",
                         fone: ((_j = data.emittente.endereco.telefone) === null || _j === void 0 ? void 0 : _j.replace(/[^\d]/g, '')) || undefined
                     },
-                    IE: data.emittente.inscricao_estadual,
+                    IE: data.emittente.inscricao_estadual && data.emittente.inscricao_estadual.trim() !== ""
+                        ? data.emittente.inscricao_estadual.replace(/[^\d]/g, '')
+                        : undefined,
                     CRT: parseInt(data.emittente.regime_tributario || "1")
                 },
                 // Destinatário
@@ -125,7 +127,9 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                         cPais: data.destinatario.endereco.codigo_pais || "1058",
                         xPais: data.destinatario.endereco.pais || "Brasil",
                         fone: ((_k = data.destinatario.telefone) === null || _k === void 0 ? void 0 : _k.replace(/[^\d]/g, '')) || undefined
-                    }, indIEDest: parseInt(data.destinatario.indicador_ie || "9"), IE: data.destinatario.inscricao_estadual || undefined, email: data.destinatario.email || undefined }),
+                    }, indIEDest: parseInt(data.destinatario.indicador_ie || "9"), IE: data.destinatario.inscricao_estadual && data.destinatario.inscricao_estadual.trim() !== ""
+                        ? data.destinatario.inscricao_estadual.replace(/[^\d]/g, '')
+                        : undefined, email: data.destinatario.email || undefined }),
                 // Items/Products
                 det: data.produtos.map((item) => {
                     const icmsConfig = item.icms_situacao_tributaria.startsWith("1")
