@@ -364,7 +364,7 @@ export function NFeFormSimple() {
     if (!validateIE(emittente.inscricao_estadual)) {
       const msg = "State registration (IE) must be 2-14 digits (optional)";
       errors.push("Issuer " + msg);
-      newFieldErrors['emittente.inscricao_estadual'] = { field: 'emittente.inscricao_estadual', message: msg, example: 'Example: 123456789 or leave empty if exempt' };
+      newFieldErrors['emittente.inscricao_estadual'] = { field: 'emittente.inscricao_estadual', message: msg, example: 'Example: 90818021-62 or leave empty if exempt' };
     }
     if (!validatePhone(emittente.endereco.telefone)) {
       const msg = "Phone must be 10-11 digits (optional)";
@@ -421,7 +421,7 @@ export function NFeFormSimple() {
     if (!validateIE(destinatario.inscricao_estadual)) {
       const msg = "State registration (IE) must be 2-14 digits (optional)";
       errors.push("Customer " + msg);
-      newFieldErrors['destinatario.inscricao_estadual'] = { field: 'destinatario.inscricao_estadual', message: msg, example: 'Example: 123456789 or leave empty if exempt' };
+      newFieldErrors['destinatario.inscricao_estadual'] = { field: 'destinatario.inscricao_estadual', message: msg, example: 'Example: 90818021-62 or leave empty if exempt' };
     }
     if (!validateEmail(destinatario.email)) {
       const msg = "Email must be valid (optional)";
@@ -794,7 +794,7 @@ export function NFeFormSimple() {
                   <Input
                     value={emittente.inscricao_estadual}
                     onChange={(e) => setEmittente({ ...emittente, inscricao_estadual: e.target.value })}
-                    placeholder="123456789 (optional, 2-14 digits)"
+                    placeholder="90818021-62 (optional, 2-14 digits)"
                     className={showValidation && fieldErrors['emittente.inscricao_estadual'] ? 'border-red-500' : ''}
                   />
                   <FieldErrorMessage fieldName="emittente.inscricao_estadual" />
@@ -995,7 +995,7 @@ export function NFeFormSimple() {
                   <Input
                     value={destinatario.inscricao_estadual}
                     onChange={(e) => setDestinatario({ ...destinatario, inscricao_estadual: e.target.value })}
-                    placeholder="123456789 (optional, 2-14 digits)"
+                    placeholder="90818021-62 (optional, 2-14 digits)"
                     className={showValidation && fieldErrors['destinatario.inscricao_estadual'] ? 'border-red-500' : ''}
                   />
                   <FieldErrorMessage fieldName="destinatario.inscricao_estadual" />

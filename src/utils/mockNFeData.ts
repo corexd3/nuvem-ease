@@ -15,7 +15,7 @@ export const mockNFeConfig = {
 
 export const mockEmittente = {
   cpf_cnpj: "28.084.062/0001-48", // Valid test CNPJ format
-  inscricao_estadual: "123456789",
+  inscricao_estadual: "90818021-62",
   razao_social: "EMPRESA TESTE LTDA",
   nome_fantasia: "Empresa Teste",
   regime_tributario: "1", // Simples Nacional
