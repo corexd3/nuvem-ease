@@ -325,9 +325,32 @@ export function NFeFormSimple() {
     return cleaned.length === 8;
   };
 
-  const validateIE = (ie: string): boolean => {
-    // IE is optional, but if provided must be 2-14 digits
-    if (!ie || ie.trim() === '') return true; // Optional field
+  const validateIE = (ie: string, indicador: string): boolean => {
+    // IE validation depends on the indicator (indIEDest)
+    // 1 = Contributor (IE required, 2-14 digits)
+    // 2 = Exempt (IE should be "ISENTO" or similar)
+    // 9 = Non-contributor (IE should be empty/null)
+
+    if (indicador === "9") {
+      // Non-contributor: IE should be empty
+      return !ie || ie.trim() === '';
+    }
+
+    if (indicador === "2") {
+      // Exempt: IE can be empty or "ISENTO"
+      if (!ie || ie.trim() === '') return true;
+      return ie.toUpperCase() === 'ISENTO';
+    }
+
+    if (indicador === "1") {
+      // Contributor: IE is required and must be 2-14 digits
+      if (!ie || ie.trim() === '') return false; // Required!
+      const cleaned = ie.replace(/\D/g, '');
+      return cleaned.length >= 2 && cleaned.length <= 14;
+    }
+
+    // Default: allow empty or valid format
+    if (!ie || ie.trim() === '') return true;
     const cleaned = ie.replace(/\D/g, '');
     return cleaned.length >= 2 && cleaned.length <= 14;
   };
@@ -361,10 +384,14 @@ export function NFeFormSimple() {
       errors.push("Issuer " + msg);
       newFieldErrors['emittente.razao_social'] = { field: 'emittente.razao_social', message: msg, example: 'Example: Empresa XYZ Ltda' };
     }
-    if (!validateIE(emittente.inscricao_estadual)) {
-      const msg = "State registration (IE) must be 2-14 digits (optional)";
-      errors.push("Issuer " + msg);
-      newFieldErrors['emittente.inscricao_estadual'] = { field: 'emittente.inscricao_estadual', message: msg, example: 'Example: 90818021-62 or leave empty if exempt' };
+    // For issuer, IE is typically optional (can be empty for some tax regimes)
+    if (emittente.inscricao_estadual && emittente.inscricao_estadual.trim() !== '') {
+      const cleaned = emittente.inscricao_estadual.replace(/\D/g, '');
+      if (cleaned.length < 2 || cleaned.length > 14) {
+        const msg = "State registration (IE) must be 2-14 digits if provided";
+        errors.push("Issuer " + msg);
+        newFieldErrors['emittente.inscricao_estadual'] = { field: 'emittente.inscricao_estadual', message: msg, example: 'Example: 123456789' };
+      }
     }
     if (!validatePhone(emittente.endereco.telefone)) {
       const msg = "Phone must be 10-11 digits (optional)";
@@ -418,10 +445,24 @@ export function NFeFormSimple() {
       errors.push("Customer " + msg);
       newFieldErrors['destinatario.razao_social'] = { field: 'destinatario.razao_social', message: msg, example: 'Example: João Silva or Empresa ABC' };
     }
-    if (!validateIE(destinatario.inscricao_estadual)) {
-      const msg = "State registration (IE) must be 2-14 digits (optional)";
+    // Validate IE based on indicator
+    if (!validateIE(destinatario.inscricao_estadual, destinatario.indicador_ie)) {
+      let msg = "";
+      let example = "";
+
+      if (destinatario.indicador_ie === "1") {
+        msg = "State registration (IE) is required for contributors";
+        example = "Example: 123456789 (2-14 digits)";
+      } else if (destinatario.indicador_ie === "2") {
+        msg = "For exempt taxpayers, IE should be empty or 'ISENTO'";
+        example = "Example: ISENTO or leave empty";
+      } else if (destinatario.indicador_ie === "9") {
+        msg = "For non-contributors, IE must be empty";
+        example = "Leave IE field empty";
+      }
+
       errors.push("Customer " + msg);
-      newFieldErrors['destinatario.inscricao_estadual'] = { field: 'destinatario.inscricao_estadual', message: msg, example: 'Example: 90818021-62 or leave empty if exempt' };
+      newFieldErrors['destinatario.inscricao_estadual'] = { field: 'destinatario.inscricao_estadual', message: msg, example };
     }
     if (!validateEmail(destinatario.email)) {
       const msg = "Email must be valid (optional)";
@@ -976,7 +1017,14 @@ export function NFeFormSimple() {
                   <Label>IE Indicator *</Label>
                   <Select
                     value={destinatario.indicador_ie}
-                    onValueChange={(value) => setDestinatario({ ...destinatario, indicador_ie: value })}
+                    onValueChange={(value) => {
+                      // Clear IE field if changing to non-contributor
+                      const newDestinatario = { ...destinatario, indicador_ie: value };
+                      if (value === "9") {
+                        newDestinatario.inscricao_estadual = "";
+                      }
+                      setDestinatario(newDestinatario);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -991,14 +1039,29 @@ export function NFeFormSimple() {
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <Label>State Registration (IE)</Label>
+                  <Label>
+                    State Registration (IE)
+                    {destinatario.indicador_ie === "1" && <span className="text-red-500"> *</span>}
+                  </Label>
                   <Input
                     value={destinatario.inscricao_estadual}
                     onChange={(e) => setDestinatario({ ...destinatario, inscricao_estadual: e.target.value })}
-                    placeholder="90818021-62 (optional, 2-14 digits)"
+                    placeholder={
+                      destinatario.indicador_ie === "1"
+                        ? "123456789 (required, 2-14 digits)"
+                        : destinatario.indicador_ie === "2"
+                        ? "ISENTO or leave empty"
+                        : "Leave empty for non-contributors"
+                    }
+                    disabled={destinatario.indicador_ie === "9"}
                     className={showValidation && fieldErrors['destinatario.inscricao_estadual'] ? 'border-red-500' : ''}
                   />
                   <FieldErrorMessage fieldName="destinatario.inscricao_estadual" />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {destinatario.indicador_ie === "1" && "Required for taxpayers"}
+                    {destinatario.indicador_ie === "2" && "Type 'ISENTO' or leave empty if exempt"}
+                    {destinatario.indicador_ie === "9" && "Not applicable for non-contributors"}
+                  </p>
                 </div>
                 <div>
                   <Label>Email</Label>

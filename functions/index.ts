@@ -145,9 +145,21 @@ export const issueNFe_sandbox = onCall(async (request) => {
                         fone: data.destinatario.telefone?.replace(/[^\d]/g, '') || undefined
                     },
                     indIEDest: parseInt(data.destinatario.indicador_ie || "9"),
-                    IE: data.destinatario.inscricao_estadual && data.destinatario.inscricao_estadual.trim() !== ""
-                        ? data.destinatario.inscricao_estadual.replace(/[^\d]/g, '')
-                        : undefined,
+                    IE: (() => {
+                        const indicador = data.destinatario.indicador_ie;
+                        const ie = data.destinatario.inscricao_estadual;
+
+                        // If empty or null, return undefined (will be omitted)
+                        if (!ie || ie.trim() === "") return undefined;
+
+                        // For exempt (2), allow "ISENTO" string
+                        if (indicador === "2" && ie.toUpperCase() === "ISENTO") {
+                            return "ISENTO";
+                        }
+
+                        // For contributor (1) or others, return digits only
+                        return ie.replace(/[^\d]/g, '');
+                    })(),
                     email: data.destinatario.email || undefined
                 },
 
