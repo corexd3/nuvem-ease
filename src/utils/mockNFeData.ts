@@ -14,6 +14,11 @@
  * - Leave cean empty ("") for products without barcodes (will use "SEM GTIN")
  * - Only use valid GTIN-8, GTIN-12, GTIN-13, or GTIN-14 codes
  * - Invalid/fake GTINs will be rejected by SEFAZ (Error 611)
+ *
+ * For NCM codes:
+ * - Must be valid 8-digit NCM codes from official SEFAZ database
+ * - Invalid NCMs will be rejected (Error 778)
+ * - Current valid NCMs used: 84713012 (Notebooks), 84733020 (Computer accessories), 48201000 (Office supplies)
  */
 
 export const mockNFeConfig = {
@@ -72,13 +77,13 @@ export const mockProdutos = [
     nItem: 1,
     codigo: "PROD001",
     descricao: "Produto Teste A - Eletrônicos",
-    ncm: "85171231", // Valid NCM for electronic equipment
+    ncm: "84713012", // Notebooks (valid NCM)
     cfop: "5102", // Sale of goods acquired/received from third parties
     unidade: "UN",
     quantidade: 2,
     valor_unitario: 150.00,
     valor_total: 300.00,
-    cest: "2100300",
+    cest: "", // Remove CEST for now
     cean: "", // Empty = "SEM GTIN" (product without barcode)
     origem: "0", // Nacional
     icms_situacao_tributaria: "102", // Simples Nacional - sem permissão de crédito
@@ -91,7 +96,7 @@ export const mockProdutos = [
     nItem: 2,
     codigo: "PROD002",
     descricao: "Produto Teste B - Acessórios",
-    ncm: "84733090", // Valid NCM for accessories
+    ncm: "84733020", // Parts and accessories for data processing machines (valid NCM)
     cfop: "5102",
     unidade: "UN",
     quantidade: 5,
@@ -109,8 +114,8 @@ export const mockProdutos = [
   {
     nItem: 3,
     codigo: "PROD003",
-    descricao: "Produto Teste C - Serviços",
-    ncm: "39269090",
+    descricao: "Produto Teste C - Material de Escritório",
+    ncm: "48201000", // Cadernos (notebooks/writing pads - valid NCM)
     cfop: "5102",
     unidade: "UN",
     quantidade: 1,
@@ -122,8 +127,8 @@ export const mockProdutos = [
     icms_situacao_tributaria: "102",
     icms_aliquota: 0,
     ipi_situacao_tributaria: "99",
-    pis_situacao_tributaria: "99",
-    cofins_situacao_tributaria: "99"
+    pis_situacao_tributaria: "07",
+    cofins_situacao_tributaria: "07"
   }
 ];
 
