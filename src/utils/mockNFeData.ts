@@ -18,7 +18,7 @@
  * For NCM codes:
  * - Must be valid 8-digit NCM codes from official SEFAZ database
  * - Invalid NCMs will be rejected (Error 778)
- * - Current valid NCMs used: 84713012 (Notebooks), 84733020 (Computer accessories), 48201000 (Office supplies)
+ * - Current valid NCMs used: 84713012 (Notebooks), 84716053 (Mouse), 48201000 (Office supplies)
  */
 
 export const mockNFeConfig = {
@@ -95,8 +95,8 @@ export const mockProdutos = [
   {
     nItem: 2,
     codigo: "PROD002",
-    descricao: "Produto Teste B - Acessórios",
-    ncm: "84733020", // Parts and accessories for data processing machines (valid NCM)
+    descricao: "Produto Teste B - Mouse USB",
+    ncm: "84716053", // Mouse (valid NCM - widely used)
     cfop: "5102",
     unidade: "UN",
     quantidade: 5,
