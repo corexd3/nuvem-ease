@@ -19,23 +19,23 @@ export const mockNFeConfig = {
 };
 
 export const mockEmittente = {
-  cpf_cnpj: "28.084.062/0001-48", // Valid test CNPJ format
-  inscricao_estadual: "", // MEI/Simples Nacional companies may not have IE - leave empty
-  razao_social: "EMPRESA TESTE LTDA",
-  nome_fantasia: "Empresa Teste",
+  cpf_cnpj: "28.084.062/0001-48",
+  inscricao_estadual: "90818021-62",
+  razao_social: "HENRIQUE LUIS DE SOUZA",
+  nome_fantasia: "Kip Tecnologia",
   regime_tributario: "1", // Simples Nacional
   endereco: {
-    logradouro: "Rua das Flores",
-    numero: "100",
-    complemento: "Sala 201",
-    bairro: "Centro",
-    codigo_municipio: "3550308", // São Paulo/SP
-    cidade: "São Paulo",
-    uf: "SP",
-    cep: "01310-100",
+    logradouro: "HEITOR STOCKLER DE FRANCA",
+    numero: "396",
+    complemento: "",
+    bairro: "CENTRO CIVICO",
+    codigo_municipio: "4106902", // Curitiba/PR
+    cidade: "CURITIBA",
+    uf: "PR",
+    cep: "80030-030",
     codigo_pais: "1058",
     pais: "Brasil",
-    telefone: "1133334444"
+    telefone: ""
   }
 };
 

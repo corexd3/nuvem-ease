@@ -96,6 +96,7 @@ export const issueNFe_sandbox = onCall(async (request) => {
                     finNFe: parseInt(data.nfeConfig?.finalidade_emissao || "1"),
                     indFinal: parseInt(data.nfeConfig?.consumidor_final || "1"),
                     indPres: parseInt(data.nfeConfig?.presenca_comprador || "1"),
+                    indIntermed: 0, // 0=Operation without intermediary (direct sale), 1=Operation with intermediary/marketplace
                     procEmi: 0, // 0=Emissão própria
                     verProc: "1.0.0"
                 },
