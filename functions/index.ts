@@ -10,6 +10,26 @@ const NUVEM_AUTH_URL = "https://auth.nuvemfiscal.com.br/oauth/token"; // Auth UR
 const CLIENT_ID = process.env.CLIENT_ID || "";
 const CLIENT_SECRET = process.env.CLIENT_SECRET || "";
 
+// UF (State) to IBGE code mapping
+const UF_CODE_MAP: { [key: string]: number } = {
+    'AC': 12, 'AL': 27, 'AP': 16, 'AM': 13, 'BA': 29,
+    'CE': 23, 'DF': 53, 'ES': 32, 'GO': 52, 'MA': 21,
+    'MT': 51, 'MS': 50, 'MG': 31, 'PA': 15, 'PB': 25,
+    'PR': 41, 'PE': 26, 'PI': 22, 'RJ': 33, 'RN': 24,
+    'RS': 43, 'RO': 11, 'RR': 14, 'SC': 42, 'SP': 35,
+    'SE': 28, 'TO': 17
+};
+
+// Helper function to get UF code
+function getUFCode(uf: string): number {
+    const code = UF_CODE_MAP[uf.toUpperCase()];
+    if (!code) {
+        console.warn(`Unknown UF: ${uf}, defaulting to 35 (SP)`);
+        return 35;
+    }
+    return code;
+}
+
 // Helper function to get OAuth access token
 async function getNuvemFiscalToken(): Promise<string> {
     console.log('CLIENT_ID:', CLIENT_ID ? 'Set' : 'NOT SET');
@@ -79,7 +99,7 @@ export const issueNFe_sandbox = onCall(async (request) => {
 
                 // Identification
                 ide: {
-                    cUF: 35, // Código UF (simplified - should map from UF string)
+                    cUF: getUFCode(data.emittente.endereco.uf), // State code from emitter's UF
                     cNF: String(Math.floor(Math.random() * 99999999)).padStart(8, '0'), // Código numérico
                     natOp: data.nfeConfig?.natureza_operacao || "VENDA",
                     mod: 55, // Model 55 = NF-e
