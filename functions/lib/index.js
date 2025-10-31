@@ -13,6 +13,24 @@ const NUVEM_BASE_URL = "https://api.sandbox.nuvemfiscal.com.br/";
 const NUVEM_AUTH_URL = "https://auth.nuvemfiscal.com.br/oauth/token"; // Auth URL has no 'sandbox' subdomain
 const CLIENT_ID = process.env.CLIENT_ID || "";
 const CLIENT_SECRET = process.env.CLIENT_SECRET || "";
+// UF (State) to IBGE code mapping
+const UF_CODE_MAP = {
+    'AC': 12, 'AL': 27, 'AP': 16, 'AM': 13, 'BA': 29,
+    'CE': 23, 'DF': 53, 'ES': 32, 'GO': 52, 'MA': 21,
+    'MT': 51, 'MS': 50, 'MG': 31, 'PA': 15, 'PB': 25,
+    'PR': 41, 'PE': 26, 'PI': 22, 'RJ': 33, 'RN': 24,
+    'RS': 43, 'RO': 11, 'RR': 14, 'SC': 42, 'SP': 35,
+    'SE': 28, 'TO': 17
+};
+// Helper function to get UF code
+function getUFCode(uf) {
+    const code = UF_CODE_MAP[uf.toUpperCase()];
+    if (!code) {
+        console.warn(`Unknown UF: ${uf}, defaulting to 35 (SP)`);
+        return 35;
+    }
+    return code;
+}
 // Helper function to get OAuth access token
 async function getNuvemFiscalToken() {
     var _a;
@@ -40,7 +58,7 @@ async function getNuvemFiscalToken() {
 }
 // Issue NF-e
 exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0, _1, _2, _3, _4, _5, _6;
     try {
         console.log('=== issueNFe_sandbox called ===');
         if (!request.auth) {
@@ -69,7 +87,7 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                 versao: "4.00",
                 // Identification
                 ide: {
-                    cUF: 35, // Código UF (simplified - should map from UF string)
+                    cUF: getUFCode(data.emittente.endereco.uf), // State code from emitter's UF
                     cNF: String(Math.floor(Math.random() * 99999999)).padStart(8, '0'), // Código numérico
                     natOp: ((_c = data.nfeConfig) === null || _c === void 0 ? void 0 : _c.natureza_operacao) || "VENDA",
                     mod: 55, // Model 55 = NF-e
@@ -86,32 +104,71 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                     finNFe: parseInt(((_f = data.nfeConfig) === null || _f === void 0 ? void 0 : _f.finalidade_emissao) || "1"),
                     indFinal: parseInt(((_g = data.nfeConfig) === null || _g === void 0 ? void 0 : _g.consumidor_final) || "1"),
                     indPres: parseInt(((_h = data.nfeConfig) === null || _h === void 0 ? void 0 : _h.presenca_comprador) || "1"),
+                    indIntermed: 0, // 0=Operation without intermediary (direct sale), 1=Operation with intermediary/marketplace
                     procEmi: 0, // 0=Emissão própria
                     verProc: "1.0.0"
                 },
-                // Emitente
-                emit: {
-                    CNPJ: data.emittente.cpf_cnpj.replace(/[^\d]/g, ''),
-                    xNome: data.emittente.razao_social,
-                    xFant: data.emittente.nome_fantasia || data.emittente.razao_social,
-                    enderEmit: {
-                        xLgr: data.emittente.endereco.logradouro,
-                        nro: data.emittente.endereco.numero,
-                        xCpl: data.emittente.endereco.complemento || undefined,
-                        xBairro: data.emittente.endereco.bairro,
-                        cMun: data.emittente.endereco.codigo_municipio,
-                        xMun: data.emittente.endereco.cidade,
-                        UF: data.emittente.endereco.uf,
-                        CEP: data.emittente.endereco.cep.replace(/[^\d]/g, ''),
-                        cPais: data.emittente.endereco.codigo_pais || "1058",
-                        xPais: data.emittente.endereco.pais || "Brasil",
-                        fone: ((_j = data.emittente.endereco.telefone) === null || _j === void 0 ? void 0 : _j.replace(/[^\d]/g, '')) || undefined
-                    },
-                    IE: data.emittente.inscricao_estadual && data.emittente.inscricao_estadual.trim() !== ""
-                        ? data.emittente.inscricao_estadual.replace(/[^\d]/g, '')
-                        : undefined,
-                    CRT: parseInt(data.emittente.regime_tributario || "1")
-                },
+                // Emitente - Build emit object with conditional IE
+                emit: (() => {
+                    var _a, _b;
+                    const ie = (_a = data.emittente.inscricao_estadual) === null || _a === void 0 ? void 0 : _a.trim();
+                    const crt = parseInt(data.emittente.regime_tributario || "1");
+                    // Build base emit object
+                    const emitObj = {
+                        CNPJ: data.emittente.cpf_cnpj.replace(/[^\d]/g, ''),
+                        xNome: data.emittente.razao_social,
+                        xFant: data.emittente.nome_fantasia || data.emittente.razao_social,
+                        enderEmit: {
+                            xLgr: data.emittente.endereco.logradouro,
+                            nro: data.emittente.endereco.numero,
+                            xCpl: data.emittente.endereco.complemento || undefined,
+                            xBairro: data.emittente.endereco.bairro,
+                            cMun: data.emittente.endereco.codigo_municipio,
+                            xMun: data.emittente.endereco.cidade,
+                            UF: data.emittente.endereco.uf,
+                            CEP: data.emittente.endereco.cep.replace(/[^\d]/g, ''),
+                            cPais: data.emittente.endereco.codigo_pais || "1058",
+                            xPais: data.emittente.endereco.pais || "Brasil",
+                            fone: ((_b = data.emittente.endereco.telefone) === null || _b === void 0 ? void 0 : _b.replace(/[^\d]/g, '')) || undefined
+                        }
+                    };
+                    // Add CRT first
+                    emitObj.CRT = crt;
+                    // Handle IE field based on CRT
+                    // For CRT 1 (Simples Nacional): IE is REQUIRED - use "ISENTO" if not provided
+                    // For CRT 2/3 (Normal Regime): IE can be omitted
+                    if (ie && ie !== "") {
+                        const ieUpper = ie.toUpperCase();
+                        // Check if it's "ISENTO"
+                        if (ieUpper === "ISENTO") {
+                            emitObj.IE = "ISENTO";
+                        }
+                        else {
+                            // Clean and validate numeric IE
+                            const cleanIE = ie.replace(/[^\d]/g, '');
+                            // IE must be 2-14 digits for API validation
+                            if (cleanIE.length >= 2 && cleanIE.length <= 14) {
+                                emitObj.IE = cleanIE;
+                            }
+                            else {
+                                // Invalid IE - use ISENTO for Simples Nacional
+                                console.warn(`Invalid IE "${ie}" (${cleanIE.length} digits). Using ISENTO for Simples Nacional.`);
+                                if (crt === 1) {
+                                    emitObj.IE = "ISENTO";
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        // No IE provided - for Simples Nacional, IE field is required, use "ISENTO"
+                        if (crt === 1) {
+                            console.log(`No IE provided for Simples Nacional. Using ISENTO.`);
+                            emitObj.IE = "ISENTO";
+                        }
+                        // For CRT 2/3 (Normal Regime), omit IE field (don't add it)
+                    }
+                    return emitObj;
+                })(),
                 // Destinatário
                 dest: Object.assign(Object.assign({}, (data.destinatario.cpf_cnpj.replace(/[^\d]/g, '').length === 11
                     ? { CPF: data.destinatario.cpf_cnpj.replace(/[^\d]/g, '') }
@@ -126,29 +183,71 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                         CEP: data.destinatario.endereco.cep.replace(/[^\d]/g, ''),
                         cPais: data.destinatario.endereco.codigo_pais || "1058",
                         xPais: data.destinatario.endereco.pais || "Brasil",
-                        fone: ((_k = data.destinatario.telefone) === null || _k === void 0 ? void 0 : _k.replace(/[^\d]/g, '')) || undefined
-                    }, indIEDest: parseInt(data.destinatario.indicador_ie || "9"), IE: data.destinatario.inscricao_estadual && data.destinatario.inscricao_estadual.trim() !== ""
-                        ? data.destinatario.inscricao_estadual.replace(/[^\d]/g, '')
-                        : undefined, email: data.destinatario.email || undefined }),
+                        fone: ((_j = data.destinatario.telefone) === null || _j === void 0 ? void 0 : _j.replace(/[^\d]/g, '')) || undefined
+                    }, indIEDest: parseInt(data.destinatario.indicador_ie || "9"), IE: (() => {
+                        const indicador = data.destinatario.indicador_ie;
+                        const ie = data.destinatario.inscricao_estadual;
+                        // If empty or null, return undefined (will be omitted)
+                        if (!ie || ie.trim() === "")
+                            return undefined;
+                        // For exempt (2), allow "ISENTO" string
+                        if (indicador === "2" && ie.toUpperCase() === "ISENTO") {
+                            return "ISENTO";
+                        }
+                        // For contributor (1) or others, return digits only
+                        return ie.replace(/[^\d]/g, '');
+                    })(), email: data.destinatario.email || undefined }),
                 // Items/Products
                 det: data.produtos.map((item) => {
-                    const icmsConfig = item.icms_situacao_tributaria.startsWith("1")
-                        ? {
-                            ICMSSN102: {
-                                orig: parseInt(item.origem || "0"),
-                                CSOSN: item.icms_situacao_tributaria
-                            }
+                    // Determine ICMS configuration based on CRT (Tax Regime)
+                    // CRT 1 = Simples Nacional (use ICMSSN with CSOSN codes)
+                    // CRT 2 or 3 = Normal Regime (use ICMS with CST codes)
+                    const crt = parseInt(data.emittente.regime_tributario || "1");
+                    const isSimples = crt === 1;
+                    // Valid CSOSN codes for Simples Nacional: 101, 102, 103, 201, 202, 203, 300, 400, 500, 900
+                    const validCSOSN = ["101", "102", "103", "201", "202", "203", "300", "400", "500", "900"];
+                    const csosn = item.icms_situacao_tributaria;
+                    let icmsConfig;
+                    if (isSimples) {
+                        // Simples Nacional - Use ICMSSN with CSOSN
+                        if (!validCSOSN.includes(csosn)) {
+                            console.warn(`Invalid CSOSN code "${csosn}" for Simples Nacional. Using 102 as fallback.`);
                         }
-                        : {
-                            ICMS00: {
+                        icmsConfig = {
+                            [`ICMSSN${csosn}`]: {
                                 orig: parseInt(item.origem || "0"),
-                                CST: item.icms_situacao_tributaria,
-                                modBC: 0,
-                                vBC: item.valor_total,
-                                pICMS: item.icms_aliquota || 0,
-                                vICMS: (item.valor_total * (item.icms_aliquota || 0)) / 100
+                                CSOSN: csosn
                             }
                         };
+                    }
+                    else {
+                        // Regime Normal - Use ICMS with CST
+                        const cst = item.icms_situacao_tributaria;
+                        // For CST 40, 41, 50, 60 (exemption/suspension/deferral)
+                        if (["40", "41", "50", "60"].includes(cst)) {
+                            icmsConfig = {
+                                [`ICMS${cst}`]: {
+                                    orig: parseInt(item.origem || "0"),
+                                    CST: cst,
+                                    vICMS: 0,
+                                    motDesICMS: 9 // Outros (required for exemption cases)
+                                }
+                            };
+                        }
+                        else {
+                            // For CST 00, 10, 20, 30, 51, 70, 90 (with ICMS calculation)
+                            icmsConfig = {
+                                [`ICMS${cst}`]: {
+                                    orig: parseInt(item.origem || "0"),
+                                    CST: cst,
+                                    modBC: 0,
+                                    vBC: item.valor_total,
+                                    pICMS: item.icms_aliquota || 0,
+                                    vICMS: (item.valor_total * (item.icms_aliquota || 0)) / 100
+                                }
+                            };
+                        }
+                    }
                     return {
                         nItem: item.nItem,
                         prod: {
@@ -221,11 +320,11 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                 },
                 // Transport
                 transp: {
-                    modFrete: parseInt(((_l = data.transporte) === null || _l === void 0 ? void 0 : _l.modalidade_frete) || "9")
+                    modFrete: parseInt(((_k = data.transporte) === null || _k === void 0 ? void 0 : _k.modalidade_frete) || "9")
                 },
                 // Payment
                 pag: {
-                    detPag: ((_o = (_m = data.pagamento) === null || _m === void 0 ? void 0 : _m.formas_pagamento) === null || _o === void 0 ? void 0 : _o.map((fp) => ({
+                    detPag: ((_m = (_l = data.pagamento) === null || _l === void 0 ? void 0 : _l.formas_pagamento) === null || _m === void 0 ? void 0 : _m.map((fp) => ({
                         indPag: parseInt(fp.indicador_pagamento || "0"),
                         tPag: fp.meio_pagamento,
                         vPag: fp.valor || totalProdutos
@@ -237,7 +336,14 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                 }
             }
         };
-        console.log('Payload being sent to NuvemFiscal:', JSON.stringify(nfePayload, null, 2));
+        // Log important configuration for debugging
+        console.log('=== NF-e Configuration Summary ===');
+        console.log('CRT (Tax Regime):', nfePayload.infNFe.emit.CRT);
+        console.log('IE (State Registration):', nfePayload.infNFe.emit.IE || 'NOT PROVIDED');
+        console.log('Environment:', nfePayload.ambiente);
+        console.log('Products count:', nfePayload.infNFe.det.length);
+        console.log('First product ICMS:', JSON.stringify((_p = (_o = nfePayload.infNFe.det[0]) === null || _o === void 0 ? void 0 : _o.imposto) === null || _p === void 0 ? void 0 : _p.ICMS, null, 2));
+        console.log('Full payload:', JSON.stringify(nfePayload, null, 2));
         const result = await axios_1.default.post(`${NUVEM_BASE_URL}nfe`, nfePayload, {
             headers: {
                 'Authorization': `Bearer ${nuvemToken}`,
@@ -256,7 +362,7 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
             numero: result.data.numero || "Processando...",
             emittente: data.emittente,
             destinatario: data.destinatario,
-            customer_name: ((_p = data.destinatario) === null || _p === void 0 ? void 0 : _p.nome) || ((_q = data.destinatario) === null || _q === void 0 ? void 0 : _q.razao_social) || null,
+            customer_name: ((_q = data.destinatario) === null || _q === void 0 ? void 0 : _q.nome) || ((_r = data.destinatario) === null || _r === void 0 ? void 0 : _r.razao_social) || null,
             produtos: data.produtos,
             valor_total: totalValue,
             total_value: totalValue, // Add alias for compatibility
@@ -271,13 +377,42 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
         };
     }
     catch (error) {
-        console.error('NF-e creation error:', {
-            message: error.message,
-            response: (_r = error.response) === null || _r === void 0 ? void 0 : _r.data,
-            errors: JSON.stringify((_u = (_t = (_s = error.response) === null || _s === void 0 ? void 0 : _s.data) === null || _t === void 0 ? void 0 : _t.error) === null || _u === void 0 ? void 0 : _u.errors, null, 2),
-            status: (_v = error.response) === null || _v === void 0 ? void 0 : _v.status
+        console.error('=== NF-e Creation Error ===');
+        console.error('Status:', (_s = error.response) === null || _s === void 0 ? void 0 : _s.status);
+        console.error('Message:', error.message);
+        // Log detailed validation errors from NuvemFiscal
+        if ((_v = (_u = (_t = error.response) === null || _t === void 0 ? void 0 : _t.data) === null || _u === void 0 ? void 0 : _u.error) === null || _v === void 0 ? void 0 : _v.errors) {
+            console.error('Validation Errors:');
+            const errors = error.response.data.error.errors;
+            if (Array.isArray(errors)) {
+                errors.forEach((err, index) => {
+                    console.error(`  ${index + 1}. ${err.message || err}`);
+                    if (err.path)
+                        console.error(`     Path: ${err.path}`);
+                    if (err.code)
+                        console.error(`     Code: ${err.code}`);
+                });
+            }
+            else {
+                console.error(JSON.stringify(errors, null, 2));
+            }
+        }
+        else if ((_w = error.response) === null || _w === void 0 ? void 0 : _w.data) {
+            console.error('API Response:', JSON.stringify(error.response.data, null, 2));
+        }
+        // Create user-friendly error message
+        let errorMessage = 'Failed to issue NF-e';
+        if ((_y = (_x = error.response) === null || _x === void 0 ? void 0 : _x.data) === null || _y === void 0 ? void 0 : _y.message) {
+            errorMessage = error.response.data.message;
+        }
+        else if ((_1 = (_0 = (_z = error.response) === null || _z === void 0 ? void 0 : _z.data) === null || _0 === void 0 ? void 0 : _0.error) === null || _1 === void 0 ? void 0 : _1.message) {
+            errorMessage = error.response.data.error.message;
+        }
+        throw new https_1.HttpsError('internal', errorMessage, {
+            status: (_2 = error.response) === null || _2 === void 0 ? void 0 : _2.status,
+            errors: ((_5 = (_4 = (_3 = error.response) === null || _3 === void 0 ? void 0 : _3.data) === null || _4 === void 0 ? void 0 : _4.error) === null || _5 === void 0 ? void 0 : _5.errors) || null,
+            details: (_6 = error.response) === null || _6 === void 0 ? void 0 : _6.data
         });
-        throw new https_1.HttpsError('internal', 'Failed to issue NF-e', ((_w = error.response) === null || _w === void 0 ? void 0 : _w.data) || error.message);
     }
 });
 // Query invoice status

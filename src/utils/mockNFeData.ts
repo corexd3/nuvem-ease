@@ -3,10 +3,17 @@
  * All data is fictitious and valid for testing purposes only
  * Updated to match the comprehensive NF-e form structure
  *
- * NOTE: For MEI/Simples Nacional companies (CRT = 1):
+ * IMPORTANT NOTES:
+ *
+ * For MEI/Simples Nacional companies (CRT = 1):
  * - IE (inscricao_estadual) can be left empty if the company doesn't have one
  * - Or use "ISENTO" for exempt companies
  * - Only include a valid IE number if required by your state
+ *
+ * For GTIN/EAN barcodes:
+ * - Leave cean empty ("") for products without barcodes (will use "SEM GTIN")
+ * - Only use valid GTIN-8, GTIN-12, GTIN-13, or GTIN-14 codes
+ * - Invalid/fake GTINs will be rejected by SEFAZ (Error 611)
  */
 
 export const mockNFeConfig = {
@@ -72,7 +79,7 @@ export const mockProdutos = [
     valor_unitario: 150.00,
     valor_total: 300.00,
     cest: "2100300",
-    cean: "7891234567890",
+    cean: "", // Empty = "SEM GTIN" (product without barcode)
     origem: "0", // Nacional
     icms_situacao_tributaria: "102", // Simples Nacional - sem permissão de crédito
     icms_aliquota: 0,
