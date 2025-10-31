@@ -2,6 +2,11 @@
  * Mock data for testing NF-e in NuvemFiscal homologação (sandbox) environment
  * All data is fictitious and valid for testing purposes only
  * Updated to match the comprehensive NF-e form structure
+ *
+ * NOTE: For MEI/Simples Nacional companies (CRT = 1):
+ * - IE (inscricao_estadual) can be left empty if the company doesn't have one
+ * - Or use "ISENTO" for exempt companies
+ * - Only include a valid IE number if required by your state
  */
 
 export const mockNFeConfig = {
@@ -15,7 +20,7 @@ export const mockNFeConfig = {
 
 export const mockEmittente = {
   cpf_cnpj: "28.084.062/0001-48", // Valid test CNPJ format
-  inscricao_estadual: "90818021-62",
+  inscricao_estadual: "", // MEI/Simples Nacional companies may not have IE - leave empty
   razao_social: "EMPRESA TESTE LTDA",
   nome_fantasia: "Empresa Teste",
   regime_tributario: "1", // Simples Nacional
