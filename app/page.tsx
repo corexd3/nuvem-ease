@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, handleDownloadInvoiceXML } from "@/lib/firebase";
 import { onAuthStateChanged, } from "firebase/auth";
 import {
   collection,
@@ -209,6 +209,48 @@ export default function Dashboard() {
     setShowDetailsModal(true);
   };
 
+  const handleDownloadXML = async (invoice: any) => {
+    try {
+      toast({
+        title: "Downloading...",
+        description: "Downloading NF-e XML file",
+      });
+
+      const result: any = await handleDownloadInvoiceXML(invoice.id);
+
+      if (result.success && result.xml) {
+        // Create a blob from the XML string
+        const blob = new Blob([result.xml], { type: 'application/xml' });
+        const url = window.URL.createObjectURL(blob);
+
+        // Create a temporary link and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `nfe_${result.nfe_id || invoice.nfe_id || invoice.numero}.xml`;
+        document.body.appendChild(a);
+        a.click();
+
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast({
+          title: "Success",
+          description: "NF-e XML downloaded successfully",
+        });
+      } else {
+        throw new Error("No XML content received");
+      }
+    } catch (error: any) {
+      console.error('Download XML error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to download XML",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar user={user} />
@@ -259,7 +301,11 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-4">
                   <h2 className="text-xl font-semibold">Recent NFC-e Invoices</h2>
-                  <InvoiceTable invoices={getFilteredInvoices("nfce")} onViewDetails={handleViewDetails} />
+                  <InvoiceTable
+                    invoices={getFilteredInvoices("nfce")}
+                    onViewDetails={handleViewDetails}
+                    onDownloadXML={handleDownloadXML}
+                  />
                 </div>
               </TabsContent>
 
@@ -292,7 +338,11 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-4">
                   <h2 className="text-xl font-semibold">Recent NF-e Invoices</h2>
-                  <InvoiceTable invoices={getFilteredInvoices("nfe")} onViewDetails={handleViewDetails} />
+                  <InvoiceTable
+                    invoices={getFilteredInvoices("nfe")}
+                    onViewDetails={handleViewDetails}
+                    onDownloadXML={handleDownloadXML}
+                  />
                 </div>
               </TabsContent>
 
@@ -325,7 +375,11 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-4">
                   <h2 className="text-xl font-semibold">Recent NFS-e Invoices</h2>
-                  <InvoiceTable invoices={getFilteredInvoices("nfse")} onViewDetails={handleViewDetails} />
+                  <InvoiceTable
+                    invoices={getFilteredInvoices("nfse")}
+                    onViewDetails={handleViewDetails}
+                    onDownloadXML={handleDownloadXML}
+                  />
                 </div>
               </TabsContent>
             </Tabs>

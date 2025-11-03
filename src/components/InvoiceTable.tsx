@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye } from "lucide-react";
+import { Eye, Download } from "lucide-react";
 import { format } from "date-fns";
 
 interface Invoice {
@@ -18,11 +18,13 @@ interface Invoice {
   total_value: number;
   status: string;
   issued_at: string | null | undefined;
+  nfe_id?: string;
 }
 
 interface InvoiceTableProps {
   invoices: Invoice[];
   onViewDetails?: (invoice: Invoice) => void;
+  onDownloadXML?: (invoice: Invoice) => void;
 }
 
 const statusVariants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -41,7 +43,7 @@ const statusLabels: Record<string, string> = {
   processing: "Processando",
 };
 
-export function InvoiceTable({ invoices, onViewDetails }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, onViewDetails, onDownloadXML }: InvoiceTableProps) {
   return (
     <div className="rounded-lg border bg-card">
       <Table>
@@ -84,13 +86,26 @@ export function InvoiceTable({ invoices, onViewDetails }: InvoiceTableProps) {
                     : "—"}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onViewDetails?.(invoice)}
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewDetails?.(invoice)}
+                      title="View Details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {invoice.nfe_id && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDownloadXML?.(invoice)}
+                        title="Download XML"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))

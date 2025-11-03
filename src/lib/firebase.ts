@@ -120,3 +120,31 @@ export const handleUnsubscribeService = async (data: any) => {
   const unsubscribeService = httpsCallable(functions, 'unsubscribeService');
   return await unsubscribeService(data);
 }
+
+// Download NF-e XML
+export const handleDownloadNFeXML = async (nfe_id: string) => {
+  const downloadNFeXML = httpsCallable(functions, 'downloadNFeXML_sandbox', {
+    timeout: 60000 // 60 second timeout
+  });
+  try {
+    const result = await downloadNFeXML({ nfe_id });
+    return result.data;
+  } catch (error: any) {
+    console.error('handleDownloadNFeXML error:', error);
+    throw new Error(error.message || 'Failed to download NF-e XML');
+  }
+}
+
+// Download Invoice XML (by Firestore invoice_id)
+export const handleDownloadInvoiceXML = async (invoice_id: string) => {
+  const downloadInvoiceXML = httpsCallable(functions, 'downloadInvoiceXML_sandbox', {
+    timeout: 60000 // 60 second timeout
+  });
+  try {
+    const result = await downloadInvoiceXML({ invoice_id });
+    return result.data;
+  } catch (error: any) {
+    console.error('handleDownloadInvoiceXML error:', error);
+    throw new Error(error.message || 'Failed to download invoice XML');
+  }
+}

@@ -30,6 +30,15 @@ function getUFCode(uf: string): number {
     return code;
 }
 
+// Helper function to truncate string to max length
+function truncateString(value: string | undefined, maxLength: number): string | undefined {
+    if (!value || value.trim() === "") return undefined;
+    const trimmed = value.trim();
+    if (trimmed.length <= maxLength) return trimmed;
+    console.warn(`Truncating field from ${trimmed.length} to ${maxLength} characters: "${trimmed}" -> "${trimmed.substring(0, maxLength)}"`);
+    return trimmed.substring(0, maxLength);
+}
+
 // Helper function to get OAuth access token
 async function getNuvemFiscalToken(): Promise<string> {
     console.log('CLIENT_ID:', CLIENT_ID ? 'Set' : 'NOT SET');
@@ -54,6 +63,7 @@ async function getNuvemFiscalToken(): Promise<string> {
         );
 
         console.log('OAuth token obtained successfully');
+        console.log(response.data.access_token)
         return response.data.access_token;
     } catch (error: any) {
         console.error('OAuth token error:', error.response?.data || error.message);
@@ -129,19 +139,19 @@ export const issueNFe_sandbox = onCall(async (request) => {
                     // Build base emit object
                     const emitObj: any = {
                         CNPJ: data.emittente.cpf_cnpj.replace(/[^\d]/g, ''),
-                        xNome: data.emittente.razao_social,
-                        xFant: data.emittente.nome_fantasia || data.emittente.razao_social,
+                        xNome: truncateString(data.emittente.razao_social, 60) || data.emittente.razao_social.substring(0, 60),
+                        xFant: truncateString(data.emittente.nome_fantasia || data.emittente.razao_social, 60) || (data.emittente.nome_fantasia || data.emittente.razao_social).substring(0, 60),
                         enderEmit: {
-                            xLgr: data.emittente.endereco.logradouro,
+                            xLgr: truncateString(data.emittente.endereco.logradouro, 60) || data.emittente.endereco.logradouro.substring(0, 60),
                             nro: data.emittente.endereco.numero,
-                            xCpl: data.emittente.endereco.complemento || undefined,
-                            xBairro: data.emittente.endereco.bairro,
+                            xCpl: truncateString(data.emittente.endereco.complemento, 60),
+                            xBairro: truncateString(data.emittente.endereco.bairro, 60) || data.emittente.endereco.bairro.substring(0, 60),
                             cMun: data.emittente.endereco.codigo_municipio,
-                            xMun: data.emittente.endereco.cidade,
+                            xMun: truncateString(data.emittente.endereco.cidade, 60) || data.emittente.endereco.cidade.substring(0, 60),
                             UF: data.emittente.endereco.uf,
                             CEP: data.emittente.endereco.cep.replace(/[^\d]/g, ''),
                             cPais: data.emittente.endereco.codigo_pais || "1058",
-                            xPais: data.emittente.endereco.pais || "Brasil",
+                            xPais: truncateString(data.emittente.endereco.pais || "Brasil", 60) || "Brasil",
                             fone: data.emittente.endereco.telefone?.replace(/[^\d]/g, '') || undefined
                         }
                     };
@@ -191,18 +201,18 @@ export const issueNFe_sandbox = onCall(async (request) => {
                         ? { CPF: data.destinatario.cpf_cnpj.replace(/[^\d]/g, '') }
                         : { CNPJ: data.destinatario.cpf_cnpj.replace(/[^\d]/g, '') }
                     ),
-                    xNome: data.destinatario.razao_social,
+                    xNome: truncateString(data.destinatario.razao_social, 60) || data.destinatario.razao_social.substring(0, 60),
                     enderDest: {
-                        xLgr: data.destinatario.endereco.logradouro,
+                        xLgr: truncateString(data.destinatario.endereco.logradouro, 60) || data.destinatario.endereco.logradouro.substring(0, 60),
                         nro: data.destinatario.endereco.numero,
-                        xCpl: data.destinatario.endereco.complemento || undefined,
-                        xBairro: data.destinatario.endereco.bairro,
+                        xCpl: truncateString(data.destinatario.endereco.complemento, 60),
+                        xBairro: truncateString(data.destinatario.endereco.bairro, 60) || data.destinatario.endereco.bairro.substring(0, 60),
                         cMun: data.destinatario.endereco.codigo_municipio,
-                        xMun: data.destinatario.endereco.cidade,
+                        xMun: truncateString(data.destinatario.endereco.cidade, 60) || data.destinatario.endereco.cidade.substring(0, 60),
                         UF: data.destinatario.endereco.uf,
                         CEP: data.destinatario.endereco.cep.replace(/[^\d]/g, ''),
                         cPais: data.destinatario.endereco.codigo_pais || "1058",
-                        xPais: data.destinatario.endereco.pais || "Brasil",
+                        xPais: truncateString(data.destinatario.endereco.pais || "Brasil", 60) || "Brasil",
                         fone: data.destinatario.telefone?.replace(/[^\d]/g, '') || undefined
                     },
                     indIEDest: parseInt(data.destinatario.indicador_ie || "9"),
@@ -225,7 +235,7 @@ export const issueNFe_sandbox = onCall(async (request) => {
                 },
 
                 // Items/Products
-                det: data.produtos.map((item: any) => {
+                det: data.produtos.map((item: any, index: number) => {
                     // Determine ICMS configuration based on CRT (Tax Regime)
                     // CRT 1 = Simples Nacional (use ICMSSN with CSOSN codes)
                     // CRT 2 or 3 = Normal Regime (use ICMS with CST codes)
@@ -237,6 +247,8 @@ export const issueNFe_sandbox = onCall(async (request) => {
                     const csosn = item.icms_situacao_tributaria;
 
                     let icmsConfig;
+                    let vBC = 0;
+                    let vICMS = 0;
 
                     if (isSimples) {
                         // Simples Nacional - Use ICMSSN with CSOSN
@@ -249,6 +261,9 @@ export const issueNFe_sandbox = onCall(async (request) => {
                                 CSOSN: csosn
                             }
                         };
+                        // For Simples Nacional, typically no vBC/vICMS in item level
+                        vBC = 0;
+                        vICMS = 0;
                     } else {
                         // Regime Normal - Use ICMS with CST
                         const cst = item.icms_situacao_tributaria;
@@ -263,36 +278,47 @@ export const issueNFe_sandbox = onCall(async (request) => {
                                     motDesICMS: 9 // Outros (required for exemption cases)
                                 }
                             };
+                            vBC = 0;
+                            vICMS = 0;
                         } else {
                             // For CST 00, 10, 20, 30, 51, 70, 90 (with ICMS calculation)
+                            const baseCalculo = item.base_calculo_icms || item.valor_total;
+                            const aliquotaICMS = item.icms_aliquota || 0;
+                            vBC = baseCalculo;
+                            vICMS = (baseCalculo * aliquotaICMS) / 100;
+
                             icmsConfig = {
                                 [`ICMS${cst}`]: {
                                     orig: parseInt(item.origem || "0"),
                                     CST: cst,
-                                    modBC: 0,
-                                    vBC: item.valor_total,
-                                    pICMS: item.icms_aliquota || 0,
-                                    vICMS: (item.valor_total * (item.icms_aliquota || 0)) / 100
+                                    modBC: parseInt(item.modalidade_bc || "0"), // 0=Margem Valor Agregado, 1=Pauta, 2=Preço Tabelado, 3=Valor da operação
+                                    vBC: parseFloat(vBC.toFixed(2)),
+                                    pICMS: aliquotaICMS,
+                                    vICMS: parseFloat(vICMS.toFixed(2))
                                 }
                             };
                         }
                     }
 
+                    // Store vBC and vICMS for totals calculation
+                    item._calculatedVBC = vBC;
+                    item._calculatedVICMS = vICMS;
+
                     return {
-                        nItem: item.nItem,
+                        nItem: index + 1, // Use array index to ensure unique sequential numbers
                         prod: {
-                            cProd: item.codigo,
+                            cProd: truncateString(item.codigo, 60) || item.codigo.substring(0, 60),
                             cEAN: item.cean || "SEM GTIN",
-                            xProd: item.descricao,
+                            xProd: truncateString(item.descricao, 120) || item.descricao.substring(0, 120),
                             NCM: item.ncm.replace(/[^\d]/g, ''),
                             CEST: item.cest || undefined,
                             CFOP: item.cfop,
-                            uCom: item.unidade,
+                            uCom: truncateString(item.unidade, 6) || item.unidade.substring(0, 6),
                             qCom: parseFloat(item.quantidade),
                             vUnCom: parseFloat(item.valor_unitario.toFixed(10)),
                             vProd: parseFloat(item.valor_total.toFixed(2)),
                             cEANTrib: item.cean || "SEM GTIN",
-                            uTrib: item.unidade,
+                            uTrib: truncateString(item.unidade, 6) || item.unidade.substring(0, 6),
                             qTrib: parseFloat(item.quantidade),
                             vUnTrib: parseFloat(item.valor_unitario.toFixed(10)),
                             indTot: 1
@@ -321,11 +347,11 @@ export const issueNFe_sandbox = onCall(async (request) => {
                     };
                 }),
 
-                // Totals
+                // Totals - Calculate from items
                 total: {
                     ICMSTot: {
-                        vBC: 0,
-                        vICMS: 0,
+                        vBC: data.produtos.reduce((sum: number, item: any) => sum + (item._calculatedVBC || 0), 0),
+                        vICMS: data.produtos.reduce((sum: number, item: any) => sum + (item._calculatedVICMS || 0), 0),
                         vICMSDeson: 0,
                         vFCPUFDest: 0,
                         vICMSUFDest: 0,
@@ -378,7 +404,7 @@ export const issueNFe_sandbox = onCall(async (request) => {
         console.log('Products count:', nfePayload.infNFe.det.length);
         console.log('First product ICMS:', JSON.stringify(nfePayload.infNFe.det[0]?.imposto?.ICMS, null, 2));
         console.log('Full payload:', JSON.stringify(nfePayload, null, 2));
-
+        
         const result = await axios.post(
             `${NUVEM_BASE_URL}nfe`,
             nfePayload,
@@ -610,6 +636,113 @@ export const cancelInvoice_sandbox = onCall(async (request) => {
         throw new HttpsError(
             'internal',
             'Failed to cancel invoice',
+            error.response?.data || error.message
+        );
+    }
+});
+
+// Download NF-e XML by invoice_id (from Firestore)
+export const downloadInvoiceXML_sandbox = onCall(async (request) => {
+    try {
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "Authentication required");
+        }
+
+        const { invoice_id } = request.data;
+
+        if (!invoice_id) {
+            throw new HttpsError("invalid-argument", "invoice_id required");
+        }
+
+        // Get invoice from Firestore
+        const invoiceDoc = await db.collection("invoices").doc(invoice_id).get();
+
+        if (!invoiceDoc.exists) {
+            throw new HttpsError("not-found", "Invoice not found");
+        }
+
+        const invoiceData = invoiceDoc.data();
+        const nfeId = invoiceData?.nfe_id;
+
+        if (!nfeId) {
+            throw new HttpsError("invalid-argument", "NF-e ID not found in invoice");
+        }
+
+        // Get OAuth access token
+        const nuvemToken = await getNuvemFiscalToken();
+
+        // Download XML from NuvemFiscal
+        const response = await axios.get(
+            `${NUVEM_BASE_URL}nfe/${nfeId}/xml`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${nuvemToken}`,
+                    'Accept': 'application/xml'
+                },
+                responseType: 'text' // Ensure we get the XML as text
+            }
+        );
+
+        console.log('XML downloaded successfully for invoice:', invoice_id);
+
+        return {
+            success: true,
+            xml: response.data,
+            invoice_id: invoice_id,
+            nfe_id: nfeId
+        };
+
+    } catch (error: any) {
+        console.error('Download XML error:', error.response?.data || error.message);
+        throw new HttpsError(
+            'internal',
+            'Failed to download NF-e XML',
+            error.response?.data || error.message
+        );
+    }
+});
+
+// Download NF-e XML directly by nfe_id
+export const downloadNFeXML_sandbox = onCall(async (request) => {
+    try {
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "Authentication required");
+        }
+
+        const { nfe_id } = request.data;
+
+        if (!nfe_id) {
+            throw new HttpsError("invalid-argument", "nfe_id required");
+        }
+
+        // Get OAuth access token
+        const nuvemToken = await getNuvemFiscalToken();
+
+        // Download XML from NuvemFiscal
+        const response = await axios.get(
+            `${NUVEM_BASE_URL}nfe/${nfe_id}/xml`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${nuvemToken}`,
+                    'Accept': 'application/xml'
+                },
+                responseType: 'text' // Ensure we get the XML as text
+            }
+        );
+
+        console.log('XML downloaded successfully for NF-e:', nfe_id);
+
+        return {
+            success: true,
+            xml: response.data,
+            nfe_id: nfe_id
+        };
+
+    } catch (error: any) {
+        console.error('Download XML error:', error.response?.data || error.message);
+        throw new HttpsError(
+            'internal',
+            'Failed to download NF-e XML',
             error.response?.data || error.message
         );
     }

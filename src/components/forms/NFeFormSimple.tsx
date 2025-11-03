@@ -80,6 +80,16 @@ export function NFeFormSimple() {
     }
   });
 
+  // Helper function to get default ICMS code based on tax regime
+  const getDefaultICMSCode = (crt: string): string => {
+    // CRT 1 = Simples Nacional -> use CSOSN codes
+    if (crt === "1") {
+      return "102"; // CSOSN 102 = Tributada pelo Simples Nacional sem permissão de crédito
+    }
+    // CRT 2/3 = Normal Regime -> use CST codes
+    return "00"; // CST 00 = Tributada integralmente
+  };
+
   // Destinatário (Customer)
   const [destinatario, setDestinatario] = useState({
     cpf_cnpj: "",
@@ -116,12 +126,21 @@ export function NFeFormSimple() {
     cest: "",
     cean: "",
     origem: "0",
-    icms_situacao_tributaria: "102",
+    icms_situacao_tributaria: getDefaultICMSCode("1"), // Default for Simples Nacional
     icms_aliquota: 0,
     ipi_situacao_tributaria: "99",
     pis_situacao_tributaria: "07",
     cofins_situacao_tributaria: "07"
   }]);
+
+  // Update all product ICMS codes when tax regime changes
+  useEffect(() => {
+    const defaultCode = getDefaultICMSCode(emittente.regime_tributario);
+    setProdutos(prev => prev.map(p => ({
+      ...p,
+      icms_situacao_tributaria: defaultCode
+    })));
+  }, [emittente.regime_tributario]);
 
   // Transport
   const [transporte, setTransporte] = useState({
@@ -194,7 +213,7 @@ export function NFeFormSimple() {
       cest: "",
       cean: "",
       origem: "0",
-      icms_situacao_tributaria: "102",
+      icms_situacao_tributaria: getDefaultICMSCode(emittente.regime_tributario),
       icms_aliquota: 0,
       ipi_situacao_tributaria: "99",
       pis_situacao_tributaria: "07",
@@ -841,7 +860,7 @@ export function NFeFormSimple() {
                   <FieldErrorMessage fieldName="emittente.inscricao_estadual" />
                 </div>
                 <div>
-                  <Label>Tax Regime *</Label>
+                  <Label>Tax Regime (CRT) *</Label>
                   <Select
                     value={emittente.regime_tributario}
                     onValueChange={(value) => setEmittente({ ...emittente, regime_tributario: value })}
@@ -855,6 +874,9 @@ export function NFeFormSimple() {
                       <SelectItem value="3">3 - Regime Normal</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This affects ICMS codes: Simples uses CSOSN (102, 103...), Normal uses CST (00, 40...)
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -1315,13 +1337,20 @@ export function NFeFormSimple() {
                             </Select>
                           </div>
                           <div>
-                            <Label className="text-xs">ICMS CST *</Label>
+                            <Label className="text-xs">
+                              ICMS {emittente.regime_tributario === "1" ? "CSOSN" : "CST"} *
+                            </Label>
                             <Input
                               value={produto.icms_situacao_tributaria}
                               onChange={(e) => updateProduct(index, 'icms_situacao_tributaria', e.target.value)}
-                              placeholder="102"
+                              placeholder={emittente.regime_tributario === "1" ? "102, 103, 400, 900" : "00, 40, 41, 60"}
                               required
                             />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {emittente.regime_tributario === "1"
+                                ? "Simples: 101-103, 201-203, 300, 400, 500, 900"
+                                : "Normal: 00, 10, 20, 30, 40, 41, 50, 51, 60, 70, 90"}
+                            </p>
                           </div>
                           <div className="flex items-end gap-2">
                             <Button
