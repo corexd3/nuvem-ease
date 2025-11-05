@@ -48,7 +48,7 @@ async function getNuvemFiscalToken(): Promise<string> {
         client_id: CLIENT_ID,
         client_secret: CLIENT_SECRET,
         grant_type: "client_credentials",
-        scope: "nfe nfce nfse cte mdfe"
+        scope: "nfe nfce nfse cte mdfe empresa configuracao cnpj invoice"
     });
 
     try {
@@ -95,7 +95,7 @@ export const issueNFe_sandbox = onCall(async (request) => {
         console.log('Getting OAuth token from NuvemFiscal...');
         const nuvemToken = await getNuvemFiscalToken();
         console.log('Token obtained, calling NuvemFiscal API...');
-
+        console.log("!!", nuvemToken)
         // Calculate totals
         const totalProdutos = data.produtos.reduce((sum: number, p: any) => sum + p.valor_total, 0);
 
@@ -392,7 +392,23 @@ export const issueNFe_sandbox = onCall(async (request) => {
                         tPag: "01",
                         vPag: totalProdutos
                     }]
-                }
+                },
+
+                // Technical Responsible (Required for NF-e 4.0)
+                // This identifies the software/system used to issue the NF-e
+                // infRespTec: {
+                //     CNPJ: data.emittente.cpf_cnpj.replace(/[^\d]/g, ''), // Use emitter's CNPJ as tech responsible
+                //     xContato: truncateString(data.emittente.nome_fantasia || data.emittente.razao_social, 60) || "Sistema NFe",
+                //     email: "nfe@sistema.com.br", // Default technical support email
+                //     fone: (() => {
+                //         const cleanPhone = data.emittente.endereco.telefone?.replace(/[^\d]/g, '') || "";
+                //         if (cleanPhone.length >= 10 && cleanPhone.length <= 11) {
+                //             return cleanPhone;
+                //         }
+                //         // Default fallback phone (10 digits)
+                //         return "4130000000";
+                //     })()
+                // }
             }
         };
 

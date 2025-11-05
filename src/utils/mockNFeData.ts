@@ -47,7 +47,7 @@ export const mockEmittente = {
     cep: "80030-030",
     codigo_pais: "1058",
     pais: "Brasil",
-    telefone: ""
+    telefone: "41987654321" // Valid 11-digit phone with DDD
   }
 };
 

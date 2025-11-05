@@ -358,6 +358,22 @@ exports.issueNFe_sandbox = (0, https_1.onCall)(async (request) => {
                             tPag: "01",
                             vPag: totalProdutos
                         }]
+                },
+                // Technical Responsible (Required for NF-e 4.0)
+                // This identifies the software/system used to issue the NF-e
+                infRespTec: {
+                    CNPJ: data.emittente.cpf_cnpj.replace(/[^\d]/g, ''), // Use emitter's CNPJ as tech responsible
+                    xContato: truncateString(data.emittente.nome_fantasia || data.emittente.razao_social, 60) || "Sistema NFe",
+                    email: "nfe@sistema.com.br", // Default technical support email
+                    fone: (() => {
+                        var _a;
+                        const cleanPhone = ((_a = data.emittente.endereco.telefone) === null || _a === void 0 ? void 0 : _a.replace(/[^\d]/g, '')) || "";
+                        if (cleanPhone.length >= 10 && cleanPhone.length <= 11) {
+                            return cleanPhone;
+                        }
+                        // Default fallback phone (10 digits)
+                        return "4130000000";
+                    })()
                 }
             }
         };
